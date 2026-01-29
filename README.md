@@ -18,7 +18,7 @@ A complete CI/CD pipeline demonstrating enterprise practices:
 ### Prerequisites
 
 **Hardware:**
-- Mac (M1/M2/M3 or Intel)
+- Mac (M1/M2/M3)
 - Minimum: 8GB RAM, 50GB free disk space
 - Recommended: 16GB RAM, 100GB free disk space
 
