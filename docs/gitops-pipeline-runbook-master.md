@@ -441,7 +441,7 @@ gh repo create {{PROJECT_NAME}} --public --source=. --remote=origin
 
 ```bash
 # Link local to remote
-git remote add origin https://github.com/{{GITHUB_USERNAME}}/{{PROJECT_NAME}}.git
+git remote set-url origin https://github.com/{{GITHUB_USERNAME}}/{{PROJECT_NAME}}.git
 git branch -M main
 git push -u origin main
 ```
