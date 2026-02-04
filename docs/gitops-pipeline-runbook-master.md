@@ -2287,9 +2287,9 @@ kubectl exec -it vault-0 -n vault -- vault read auth/kubernetes/role/flaskapp
 │ PHASE 5: GITOPS PIPELINE ◄── YOU ARE HERE                        │
 ├──────────────────────────────────────────────────────────────────┤
 │  Code → Jenkins → Test → Lint → Build → Push → Update → Deploy   │
-│   ┌────┐   ┌──┐   ┌───┐  ┌───┐  ┌──┐  ┌───┐  ┌────┐   ┌───┐      │
-│   │Dev │──→│CI│──→│Tst│─→│Lnt│─→│Bld│→│Hub│─→│Mfst│──→│CD │      │
-│   └────┘   └──┘   └───┘  └───┘  └──┘  └───┘  └────┘   └───┘      │
+│   ┌────┐   ┌──┐   ┌───┐  ┌───┐  ┌───┐  ┌───┐  ┌────┐   ┌───┐     │
+│   │Dev │──→│CI│──→│Tst│─→│Lnt│─→│Bld│─→│Hub│─→│Mfst│──→│CD │     │
+│   └────┘   └──┘   └───┘  └───┘  └───┘  └───┘  └────┘   └───┘     │
 │    Edit    Pod   pytest  flake8 Kaniko  Push  GitOps   Sync      │
 │                                                                  │
 │  Quality Gates: Test + Lint before build • Rootless builds       │
@@ -2312,6 +2312,8 @@ kubectl exec -it vault-0 -n vault -- vault read auth/kubernetes/role/flaskapp
 ### Part A: Application Repository
 
 ### Step 5.1: Create Application Repository
+
+*We will create a dedicated Git repository to host a sample application source code, serving as the starting point for the CI/CD pipeline.*
 
 ```bash
 # Create app directory
@@ -2376,6 +2378,8 @@ EOF
 ```
 
 ### Step 5.4: Create Dockerfile
+
+*This Dockerfile defines the container image for your application by specifying the base image, copying the source code, and installing dependencies to create a portable and consistent runtime environment. It works as a blueprint that the build system will follow to package your application into an immutable container, ready to be pushed to a registry and deployed.*
 
 ```bash
 cat > Dockerfile << 'EOF'
@@ -2668,6 +2672,9 @@ git push -u origin main
 
 ### Step 5.8: Create GitOps Repository
 
+*Here we establish a separate Git repository dedicated solely to storing declarative Kubernetes manifests, which serves as the single source of truth for your cluster's desired state in the GitOps workflow.  Argo CD will continuously monitor and sync any changes to the live cluster.*
+
+
 ```bash
 mkdir -p ~/Desktop/{{PROJECT_NAME}}-manifests/{{APP_NAME}}
 cd ~/Desktop/{{PROJECT_NAME}}-manifests
@@ -2678,6 +2685,11 @@ git init
 ### Step 5.9: Create Kubernetes Manifests
 
 **Secret Injection:** These manifests use Vault Agent Injector annotations. Vault automatically injects a sidecar container that fetches secrets and writes them to `/vault/secrets/config`. The application sources this file at startup.
+
+
+#### Step 5.9.1: Create Namespace
+*This namespace manifest creates a logical boundary within your Kubernetes cluster to isolate your application's resources, providing a clean environment for deployment and simplifying access control and resource management.*
+
 
 ```bash
 cd {{APP_NAME}}
@@ -2692,6 +2704,13 @@ metadata:
     name: {{APP_NAMESPACE}}
     managed-by: argocd
 EOF
+```
+#### Step 5.9.2: Create Deployment
+*This deployment manifest defines the scalable pod specification for the application, including container image, resource limits, health checks, and integration with Vault for automatic secret injection at runtime. It works by declaring the desired state of the application pods, complete with annotations that trigger the Vault agent sidecar to fetch and expose secrets as environment variables, ensuring secure and dynamic configuration*
+
+
+```bash
+cd {{APP_NAME}}
 
 # Deployment with Vault integration
 cat > deployment.yaml << 'EOF'
@@ -2755,6 +2774,14 @@ spec:
           initialDelaySeconds: 10
           periodSeconds: 5
 EOF
+```
+
+#### Step 5.9.2: Create Service
+*This service manifest exposes the application internally within the cluster and externally via a NodePort, providing a stable network endpoint to route traffic to the running application pods. It works by defining a Kubernetes Service resource that selects pods based on labels and maps a cluster node port to the container's internal port, making the application accessible for testing and validation.*
+
+
+```bash
+cd {{APP_NAME}}
 
 # Service
 cat > service.yaml << 'EOF'
@@ -2836,6 +2863,9 @@ git push -u origin main
 
 ### Step 5.12: Create Jenkins Pipeline Job
 
+*We configure a pipeline job within the Jenkins web interface that connects to the application repository and executes the defined Jenkinsfile, automating the entire CI/CD process from code commit to deployment. Pushing the application code to repository triggers Jenkins to clone the code and run the pipeline stages within dynamically provisioned Kubernetes pods.*
+
+
 In Jenkins UI (http://{{CONTROL_PLANE_IP}}:{{JENKINS_HTTP_PORT}}):
 
 1. Click **New Item**
@@ -2916,6 +2946,7 @@ Private GitHub repositories require credentials for Argo CD to sync manifests
 5. Verify connection status shows "Successful"
 
 ### Step 5.14: Create Argo CD Application
+*This step defines an Argo CD Application resource that links your GitOps manifest repository to your Kubernetes cluster, enabling automated synchronization of the desired state defined in Git. It works by creating a YAML manifest that specifies the source repository, target cluster, and sync policy, which Argo CD uses to continuously monitor and apply any changes, ensuring the cluster matches the version-controlled configuration.*
 
 ```bash
 cd {{PROJECT_BASE_PATH}}/kubernetes/argocd/applications
@@ -3050,6 +3081,9 @@ http://{{CONTROL_PLANE_IP}}:{{APP_HTTP_PORT}}
 
 **Objective:** Test the complete GitOps workflow  
 **Time:** 30 minutes
+
+*This final step validates the entire automated pipeline by making a code change, pushing it to trigger the Jenkins build, and confirming that Argo CD automatically deploys the new version to your cluster. We will modify a file in your application repository, commit the change, and then monitor the Jenkins pipeline logs and Argo CD UI to observe the image build, manifest update, and subsequent sync that rolls out the updated application.*
+
 
 ### Step 6.1: End-to-End Pipeline Test
 
@@ -3859,7 +3893,98 @@ kubectl delete pod POD_NAME -n NAMESPACE --grace-period=0 --force
 
 ---
 
-#### Issue 11: Pods stuck at Init:0/1 state after VM Restart
+#### Issue 11: Jenkins & ArgoCD UI Not Accessible After PC Sleep/Restart
+
+**Symptoms:**
+```bash
+# UIs are not accessible in browser
+# Jenkins: http://192.168.2.10:30080 - Connection refused
+# ArgoCD: http://192.168.2.10:30083 - Connection refused
+
+# But VMs show as Running
+multipass list
+Name                    State             IPv4             Image
+k3s-control-node        Running           192.168.2.10     Ubuntu 22.04 LTS
+k3s-worker-node         Running           192.168.2.11     Ubuntu 22.04 LTS
+
+# Kubernetes pods are running
+kubectl get pods -n jenkins
+NAME                       READY   STATUS    RESTARTS   AGE
+jenkins-xxxxx-xxxxx        1/1     Running   0          10m
+
+kubectl get pods -n argocd
+NAME                                    READY   STATUS    RESTARTS   AGE
+argocd-server-xxxxx-xxxxx               1/1     Running   0          10m
+```
+
+**Root Cause:**
+
+Mac sleep mode breaks the Multipass network routing between your Mac and the VMs. The VMs are running, services are healthy, but the Mac → VM network path is broken.
+
+**Resolution:**
+
+**Step 1: Test VM connectivity**
+```bash
+# Try to ping the VMs
+ping 192.168.2.10
+ping 192.168.2.11
+
+# If ping fails, the network is broken
+```
+
+**Step 2: Restart VMs (Most reliable fix)**
+```bash
+# Stop both VMs
+multipass stop k3s-control-node k3s-worker-node
+
+# Start them back up
+multipass start k3s-control-node k3s-worker-node
+
+# Wait 30-60 seconds for K3s to fully start
+sleep 60
+
+# Verify VMs are accessible
+ping 192.168.2.10
+
+# Test UI access
+open http://192.168.2.10:30080  # Jenkins
+open http://192.168.2.10:30083  # ArgoCD
+```
+
+**Step 3: If UIs accessible but some pods failing**
+
+After VM restart, some pods may be in `Unknown`, `Completed`, or `CrashLoopBackOff` state:
+
+```bash
+# Check pod status across all namespaces
+kubectl get pods -A | grep -E 'Unknown|Completed|Error|CrashLoop'
+
+# Common issues after restart:
+# 1. argocd-repo-server in Completed state
+kubectl delete pod -n argocd -l app.kubernetes.io/name=argocd-repo-server
+
+# 2. argocd-applicationset-controller in CrashLoopBackOff
+kubectl delete pod -n argocd -l app.kubernetes.io/name=argocd-applicationset-controller
+
+# 3. Application pods stuck in Unknown state
+kubectl delete pod --all -n sample-app-namespace
+```
+
+**Step 4: Check for Vault authentication issues**
+
+If pods remain in `Init:0/1` state, see **Issue 12: Pods stuck at Init:0/1 state after VM Restart** below for Vault reconfiguration steps.
+
+
+**Prevention:**
+
+For production or long-running training environments, consider:
+- Using a dedicated Linux VM instead of Multipass
+- Cloud-based K8s clusters (EKS, GKE, AKS)
+- Keeping your Mac from sleeping during active training sessions
+
+---
+
+#### Issue 12: Pods stuck at Init:0/1 state after VM Restart
 
 **⚠️ Vault Dev Mode Limitation**
 
