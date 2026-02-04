@@ -44,7 +44,7 @@ Click the "Fork" button on GitHub to create your own copy.
 
 **Step 2: Clone your fork**
 ```bash
-git clone https://github.com/YOUR_USERNAME/gitops-training.git
+git clone https://github.com/YOUR_USERNAME/gitops-training-with-runbook.git
 cd gitops-training
 ```
 
