@@ -3906,14 +3906,14 @@ kubectl delete pod POD_NAME -n NAMESPACE --grace-period=0 --force
 **Symptoms:**
 ```bash
 # UIs are not accessible in browser
-# Jenkins: http://192.168.2.10:30080 - Connection refused
-# ArgoCD: http://192.168.2.10:30083 - Connection refused
+# Jenkins: http://{{WORKER_HOSTNAME}}:{{JENKINS_HTTP_PORT}} - Connection refused
+# ArgoCD: http://{{WORKER_HOSTNAME}}:{{ARGOCD_HTTP_PORT}} - Connection refused
 
 # But VMs show as Running
 multipass list
-Name                    State             IPv4             Image
-k3s-control-node        Running           192.168.2.10     Ubuntu 22.04 LTS
-k3s-worker-node         Running           192.168.2.11     Ubuntu 22.04 LTS
+Name                              State             IPv4             Image
+{{CONTROL_PLANE_HOSTNAME}}        Running           {{CONTROL_PLANE_IP}}     Ubuntu 22.04 LTS
+{{WORKER_HOSTNAME}}               Running           {{WORKER_NODE_IP}}     Ubuntu 22.04 LTS
 
 # Kubernetes pods are running
 kubectl get pods -n jenkins
@@ -3934,8 +3934,8 @@ Mac sleep mode breaks the Multipass network routing between your Mac and the VMs
 **Step 1: Test VM connectivity**
 ```bash
 # Try to ping the VMs
-ping 192.168.2.10
-ping 192.168.2.11
+ping {{CONTROL_PLANE_IP}}
+ping {{WORKER_NODE_IP}}
 
 # If ping fails, the network is broken
 ```
@@ -3943,20 +3943,20 @@ ping 192.168.2.11
 **Step 2: Restart VMs (Most reliable fix)**
 ```bash
 # Stop both VMs
-multipass stop k3s-control-node k3s-worker-node
+multipass stop {{CONTROL_PLANE_HOSTNAME}} {{WORKER_HOSTNAME}}
 
 # Start them back up
-multipass start k3s-control-node k3s-worker-node
+multipass start {{CONTROL_PLANE_HOSTNAME}} {{WORKER_HOSTNAME}}
 
 # Wait 30-60 seconds for K3s to fully start
 sleep 60
 
 # Verify VMs are accessible
-ping 192.168.2.10
+ping {{CONTROL_PLANE_IP}}
 
 # Test UI access
-open http://192.168.2.10:30080  # Jenkins
-open http://192.168.2.10:30083  # ArgoCD
+open http://{{CONTROL_PLANE_IP}}:{{JENKINS_HTTP_PORT}}  # Jenkins
+open http://{{CONTROL_PLANE_IP}}:{{ARGOCD_HTTP_PORT}}  # ArgoCD
 ```
 
 **Step 3: If UIs accessible but some pods failing**
