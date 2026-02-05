@@ -960,7 +960,7 @@ EOF
 Run preflight checks:
 
 ```bash
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/preflight-checks.yml
+ansible-playbook -i {{PROJECT_BASE_PATH}}/ansible/inventory/hosts.yml {{PROJECT_BASE_PATH}}/ansible/playbooks/preflight-checks.yml
 ```
 
 **Expected:** All checks pass, showing system resources
@@ -1029,7 +1029,9 @@ EOF
 Run system preparation:
 
 ```bash
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/prepare-systems.yml
+cd ~/Desktop/gitops-training-with-runbook
+
+ansible-playbook -i {{PROJECT_BASE_PATH}}/ansible/inventory/hosts.yml {{PROJECT_BASE_PATH}}/ansible/playbooks/prepare-systems.yml
 ```
 
 **Expected:** All tasks complete successfully
@@ -1037,6 +1039,8 @@ ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/prepare-system
 ### Step 2.6: Verify System Preparation
 
 ```bash
+cd ~/Desktop/gitops-training-with-runbook
+
 # Verify system configuration on both nodes
 ansible k3s_cluster -i ansible/inventory/hosts.yml -a "cat /proc/sys/net/ipv4/ip_forward"
 # Expected: 1 (IP forwarding enabled)
@@ -1157,7 +1161,7 @@ EOF
 Run K3s server installation:
 
 ```bash
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/install-k3s-server.yml
+ansible-playbook -i {{PROJECT_BASE_PATH}}/ansible/inventory/hosts.yml {{PROJECT_BASE_PATH}}/ansible/playbooks/install-k3s-server.yml
 ```
 
 **Expected Output:**
@@ -1227,7 +1231,7 @@ EOF
 Run K3s agent installation:
 
 ```bash
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/install-k3s-agent.yml
+ansible-playbook -i {{PROJECT_BASE_PATH}}/ansible/inventory/hosts.yml {{PROJECT_BASE_PATH}}/ansible/playbooks/install-k3s-agent.yml
 ```
 
 **Expected:** Agent installs and connects to control plane
@@ -1878,7 +1882,7 @@ cd {{PROJECT_BASE_PATH}}/kubernetes/argocd
 kubectl create namespace {{ARGOCD_NAMESPACE}}
 
 # Install Argo CD
-kubectl apply -n {{ARGOCD_NAMESPACE}} -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl apply --server-side -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
 # Wait for pods to be ready
 kubectl wait --for=condition=Ready pods --all -n {{ARGOCD_NAMESPACE}} --timeout=300s
@@ -1900,7 +1904,7 @@ kubectl get pods -n {{ARGOCD_NAMESPACE}}
 
 ```bash
 # Patch service to use NodePort
-kubectl patch svc argocd-server -n {{ARGOCD_NAMESPACE}} -p '{"spec":{"type":"NodePort","ports":[{"name":"http","port":80,"targetPort":8080,"nodePort":{{ARGOCD_HTTP_PORT}}},{"name":"https","port":443,"targetPort":8080,"nodePort":{{ARGOCD_HTTPS_PORT}}}]}}'
+kubectl patch svc argocd-server -n {{ARGOCD_NAMESPACE}} -p '{"spec": {"type": "NodePort","ports": [{"name": "http","port": 80,"targetPort": 8080,"nodePort": {{ARGOCD_HTTP_PORT}}},{"name": "https","port": 443,"targetPort": 8080,"nodePort": {{ARGOCD_HTTPS_PORT}}}]}}'
 
 # Verify service
 kubectl get svc -n {{ARGOCD_NAMESPACE}} argocd-server
@@ -2192,7 +2196,7 @@ EOF
 chmod +x install-vault.sh
 ```
 
-### Create installation script
+### Create configuration script
 
 *Creata a configuration script that programmatically sets up Vault's Kubernetes authentication method and access policies by executing commands directly inside the Vault pod, ensuring the authentication backend is ready for applications to retrieve secrets. It works by encapsulating the necessary vault auth enable and policy creation commands into a script that can be run after installation, establishing the secure link between your Kubernetes cluster and the Vault server.*
 
@@ -2332,6 +2336,7 @@ from flask import Flask, render_template_string
 import os
 import socket
 
+
 app = Flask(__name__)
 
 VERSION = os.getenv('APP_VERSION', '1.0.0')
@@ -2351,6 +2356,7 @@ HTML_TEMPLATE = """
 </html>
 """
 
+
 @app.route('/')
 def home():
     return render_template_string(
@@ -2359,9 +2365,11 @@ def home():
         pod_name=POD_NAME
     )
 
+
 @app.route('/health')
 def health():
     return {'status': 'healthy', 'version': VERSION}, 200
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
