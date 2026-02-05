@@ -3241,7 +3241,7 @@ kubectl exec -n {{APP_NAMESPACE}} $POD_NAME -c {{APP_NAME}} -- cat /vault/secret
 kubectl describe pod -n {{APP_NAMESPACE}} -l app={{APP_NAME}} | grep -A 2 "vault-agent:"
 
 # Test secret access
-kubectl exec -n {{APP_NAMESPACE}} $POD_NAME -c {{APP_NAME}} -- sh -c 'source /vault/secrets/config && echo $APP_SECRET'
+kubectl exec -n {{APP_NAMESPACE}} $POD_NAME -c {{APP_NAME}} -- sh -c '. /vault/secrets/config && echo $APP_SECRET'
 ```
 
 **Expected:** Shows `ProductionSecretValue2024`
