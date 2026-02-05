@@ -2111,7 +2111,7 @@ sequenceDiagram
     participant K8sAPI as Kubernetes API
     participant Policy as Vault Policy Engine
     participant Role as Kubernetes Auth Role
-    participant Pod as Application Pod<br/>(sample-app-namespace)
+    participant Pod as Application Pod<br/>({{APP_NAMESPACE}})
     participant SA as Service Account<br/>(default)
 
 
@@ -2122,7 +2122,7 @@ sequenceDiagram
         Pod->>Vault: Authenticate with JWT token
         Vault->>K8sAPI: Verify token validity
         K8sAPI-->>Vault: Token valid ✓
-        Vault->>Role: Check role: flaskapp<br/>SA=default? ✓<br/>Namespace=sample-app-namespace? ✓
+        Vault->>Role: Check role: flaskapp<br/>SA=default? ✓<br/>Namespace={{APP_NAMESPACE}}? ✓
         Role-->>Vault: Authorization granted
         Vault->>Policy: Check flaskapp-policy permissions
         Policy-->>Vault: Can read secret/data/flaskapp/*
@@ -2758,7 +2758,7 @@ spec:
         - containerPort: 5000
           name: http
         command: ["/bin/sh", "-c"]
-        args: ["source /vault/secrets/config && gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 60 app:app"]
+        args: [". /vault/secrets/config && gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 60 app:app"]
         env:
         - name: APP_VERSION
           value: "1.0.0"
@@ -2957,7 +2957,9 @@ Private GitHub repositories require credentials for Argo CD to sync manifests
 *This step defines an Argo CD Application resource that links your GitOps manifest repository to your Kubernetes cluster, enabling automated synchronization of the desired state defined in Git. It works by creating a YAML manifest that specifies the source repository, target cluster, and sync policy, which Argo CD uses to continuously monitor and apply any changes, ensuring the cluster matches the version-controlled configuration.*
 
 ```bash
-cd {{PROJECT_BASE_PATH}}/kubernetes/argocd/applications
+cd {{PROJECT_BASE_PATH}}/kubernetes/argocd
+mkdir -p applications
+cd applications
 
 cat > {{APP_NAME}}.yaml << 'EOF'
 apiVersion: argoproj.io/v1alpha1
@@ -3006,7 +3008,7 @@ You already created `dockerhub-credentials` in the Jenkins namespace (Step 4.10)
 | Secret | Namespace | Used By |
 |--------|-----------|---------|
 | `dockerhub-credentials` | `jenkins` | Jenkins pod, Kaniko builds |
-| `dockerhub-secret` | `sample-app-namespace` | Flask application pods |
+| `dockerhub-secret` | `{{APP_NAMESPACE}}` | Flask application pods |
 
 
 Create the Docker Hub secret in the application namespace to pull private images:
@@ -3018,10 +3020,10 @@ kubectl create secret docker-registry dockerhub-secret \
   --docker-username={{DOCKERHUB_USERNAME}} \
   --docker-password=YOUR_DOCKERHUB_TOKEN \
   --docker-email=YOUR_EMAIL \
-  -n sample-app-namespace
+  -n {{APP_NAMESPACE}}
 
 # Verify secret created
-kubectl get secret dockerhub-secret -n sample-app-namespace
+kubectl get secret dockerhub-secret -n {{APP_NAMESPACE}}
 ```
 
 **📝 Note:** Use the same Docker Hub access token you created in Step 4.10.
@@ -3975,7 +3977,7 @@ kubectl delete pod -n argocd -l app.kubernetes.io/name=argocd-repo-server
 kubectl delete pod -n argocd -l app.kubernetes.io/name=argocd-applicationset-controller
 
 # 3. Application pods stuck in Unknown state
-kubectl delete pod --all -n sample-app-namespace
+kubectl delete pod --all -n {{APP_NAMESPACE}}
 ```
 
 **Step 4: Check for Vault authentication issues**
@@ -4006,12 +4008,12 @@ This training setup uses Vault in development mode with in-memory storage (`Stor
 
 ```bash
 # Application pods stuck in Init:0/1 or CrashLoopBackOff
-kubectl get pods -n sample-app-namespace
+kubectl get pods -n {{APP_NAMESPACE}}
 NAME                               READY   STATUS     RESTARTS   AGE
 sample-flask-app-xxxxx-xxxxx       0/2     Init:0/1   0          2m
 
 # Vault agent logs show authentication errors
-kubectl logs POD_NAME -n sample-app-namespace -c vault-agent-init
+kubectl logs POD_NAME -n {{APP_NAMESPACE}} -c vault-agent-init
 [ERROR] agent.auth.handler: error authenticating: error="permission denied"
 ```
 
@@ -4045,7 +4047,7 @@ EOF
 # Create role binding policy to Service Account
 vault write auth/kubernetes/role/flaskapp \
     bound_service_account_names=default \
-    bound_service_account_namespaces=sample-app-namespace \
+    bound_service_account_namespaces={{APP_NAMESPACE}} \
     policies=flaskapp-policy \
     ttl=24h
 
@@ -4069,10 +4071,10 @@ kubectl exec -it vault-0 -n vault -- \
 **Step 4: Clean Up Failed Pods**
 ```bash
 # Delete pods stuck in Unknown or Init state
-kubectl delete pod --all -n sample-app-namespace
+kubectl delete pod --all -n {{APP_NAMESPACE}}
 
 # ArgoCD will automatically recreate them
-kubectl get pods -n sample-app-namespace -w
+kubectl get pods -n {{APP_NAMESPACE}} -w
 ```
 
 **Expected Result:**
