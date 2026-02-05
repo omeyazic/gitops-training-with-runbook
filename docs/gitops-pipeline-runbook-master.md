@@ -3117,7 +3117,8 @@ HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head><title>GitOps Pipeline Demo</title><head>
-<body style="font-family: Arial; text-align: center; padding: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+<body style="font-family: Arial; text-align: center; padding: 50px;
+background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
     <h1>🚀 GitOps Pipeline - Hello from K3s!</h1>
     <h2>✨ Version 2.0 - Updated!</h2>
     <p><strong>Version:</strong> {{ version }}</p>
@@ -3129,6 +3130,7 @@ HTML_TEMPLATE = """
 </html>
 """
 
+
 @app.route('/')
 def home():
     return render_template_string(
@@ -3137,9 +3139,11 @@ def home():
         pod_name=POD_NAME
     )
 
+
 @app.route('/health')
 def health():
     return {'status': 'healthy', 'version': VERSION}, 200
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
