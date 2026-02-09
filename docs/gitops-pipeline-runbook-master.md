@@ -3,7 +3,7 @@
 **Document Type:** Implementation Runbook  
 **Target Audience:** DevOps Engineers, SREs, Platform Teams  
 **Deployment Model:** Local Development Environment (Mac M1/M2, ARM64)  
-**Estimated Time:** 5-6 hours (first-time deployment)  
+**Estimated Time:** 6-8 hours (first-time deployment)  
 **Difficulty Level:** Intermediate to Advanced
 
 ---
@@ -22,9 +22,13 @@
    - Secret Management (HashiCorp Vault)
 8. [Phase 5: GitOps Pipeline](#phase-5-gitops-pipeline)
 9. [Phase 6: Validation & Testing](#phase-6-validation--testing)
-10. [Teardown & Cleanup](#teardown--cleanup)
-11. [Troubleshooting](#troubleshooting)
-12. [Future Enhancements](#future-enhancements)
+10. [Phase 7: Observability & Monitoring](#phase-7-observability--monitoring)
+    - Prometheus Installation
+    - Grafana Installation
+    - Dashboard Configuration
+11. [Teardown & Cleanup](#teardown--cleanup)
+12. [Troubleshooting](#troubleshooting)
+13. [Future Enhancements](#future-enhancements)
 
 ---
 
@@ -32,7 +36,7 @@
 
 ```
 Phase 0: Environment Setup (30 min)
-   ↓     Setup tools, directories, Gi
+   ↓     Setup tools, directories, Git
 Phase 1: Infrastructure Provisioning (20 min)
    ↓     Create VMs with Terraform
 Phase 2: Configuration Management (20 min)
@@ -44,10 +48,12 @@ Phase 4: DevOps Services (90 min)
 Phase 5: GitOps Pipeline (90 min)
    ↓     Build with Kaniko, deploy with Argo CD
 Phase 6: Validation & Testing (30 min)
-   ✓     Test production-grade workflow
+   ↓     Test production-grade workflow
+Phase 7: Observability & Monitoring (45 min)
+   ✓     Deploy Prometheus & Grafana, create dashboards
 ```
 
-**Total Time:** ~5-6 hours  
+**Total Time:** ~6-8 hours  
 **Outcome:** Production-ready local GitOps pipeline with security best practices
 
 **🎓 What Makes This Production-Grade:**
@@ -90,40 +96,42 @@ This guide contains two types of `{{...}}` syntax:
 
 ### Variable Reference Table
 
-| Category | Variable | Default Value | Description | Example | Variable Used for this project |
+| Category | Variable Name | Default Value | Description | Example | Variable Used for this project |
 |----------|----------|---------------|-------------|---------|---------|
 | **Project Names** | | | | |
-| | `{{PROJECT_NAME}}` | `mygitopspipeline` | Main project/repo name | `my-devops-lab` | |
-| | `{{APP_NAME}}` | `hello-gitops` | Application name | `flask-demo` | |
+| | `PROJECT_NAME` | `mygitopspipeline` | Main project/repo name | `my-devops-lab` | `{{PROJECT_NAME}}` |
+| | `APP_NAME` | `hello-gitops` | Application name | `flask-demo` | `{{APP_NAME}}` |
 | **Network** | | | | | |
-| | `{{CONTROL_PLANE_IP}}` | `192.168.2.2` | Control plane VM IP | `192.168.64.10` | |
-| | `{{WORKER_NODE_IP}}` | `192.168.2.3` | Worker node VM IP | `192.168.64.11` | |
-| | `{{ANSIBLE_CONTROL_IP}}` | `192.168.2.4` | Ansible inventory control IP | `192.168.64.10` | |
-| | `{{ANSIBLE_WORKER_IP}}` | `192.168.2.5` | Ansible inventory worker IP | `192.168.64.11` | |
+| | `CONTROL_PLANE_IP` | `192.168.2.2` | Control plane VM IP | `192.168.64.10` | `{{CONTROL_PLANE_IP}}` |
+| | `WORKER_NODE_IP` | `192.168.2.3` | Worker node VM IP | `192.168.64.11` | `{{WORKER_NODE_IP}}`  |
+| | `ANSIBLE_CONTROL_IP` | `192.168.2.4` | Ansible inventory control IP | `192.168.64.10` |`{{ANSIBLE_CONTROL_IP}}` |
+| | `ANSIBLE_WORKER_IP` | `192.168.2.5` | Ansible inventory worker IP | `192.168.64.11` |`{{ANSIBLE_WORKER_IP}}` |
 | **Service Ports** | | | | | |
-| | `{{JENKINS_HTTP_PORT}}` | `30080` | Jenkins web interface | `30080` | |
-| | `{{JENKINS_AGENT_PORT}}` | `30081` | Jenkins agent communication | `30081` | |
-| | `{{ARGOCD_HTTP_PORT}}` | `30083` | Argo CD HTTP access | `30083` | |
-| | `{{ARGOCD_HTTPS_PORT}}` | `30082` | Argo CD HTTPS access | `30082` | |
-| | `{{APP_HTTP_PORT}}` | `30084` | Application web access | `30085` | |
+| | `JENKINS_HTTP_PORT` | `30080` | Jenkins web interface | `30080` |`{{JENKINS_HTTP_PORT}}` |
+| | `JENKINS_AGENT_PORT` | `30081` | Jenkins agent communication | `30081` | `{{JENKINS_AGENT_PORT}}` |
+| | `ARGOCD_HTTP_PORT` | `30083` | Argo CD HTTP access | `30083` | `{{ARGOCD_HTTP_PORT}}` |
+| | `ARGOCD_HTTPS_PORT` | `30082` | Argo CD HTTPS access | `30082` | `{{ARGOCD_HTTPS_PORT}}` |
+| | `APP_HTTP_PORT` | `30084` | Application web access | `30085` | `{{APP_HTTP_PORT}}` |
+| | `PROMETHEUS_HTTP_PORT` | `30090` | Prometheus web interface | `30090` | `{{PROMETHEUS_HTTP_PORT}}` |
+| | `GRAFANA_HTTP_PORT` | `30300` | Grafana dashboards | `30300` | `{{GRAFANA_HTTP_PORT}}` |
 | **Infrastructure** | | | | | |
-| | `{{CONTROL_PLANE_HOSTNAME}}` | `k3s-control-01` | Control plane hostname | `k3s-master-01` | |
-| | `{{WORKER_HOSTNAME}}` | `k3s-worker-01` | Worker node hostname | `k3s-node-01` | |
-| | `{{K3S_VERSION}}` | `v1.28.5+k3s1` | K3s Kubernetes version | `v1.28.5+k3s1` | |
-| | `{{K3S_TOKEN}}` | `my-secret-token` | K3s cluster join token | `prod-k3s-secret-2024` | |
+| | `CONTROL_PLANE_HOSTNAME` | `k3s-control-01` | Control plane hostname | `k3s-master-01` | `{{CONTROL_PLANE_HOSTNAME}}` |
+| | `WORKER_HOSTNAME` | `k3s-worker-01` | Worker node hostname | `k3s-node-01` | `{{WORKER_HOSTNAME}}` |
+| | `K3S_VERSION` | `v1.28.5+k3s1` | K3s Kubernetes version | `v1.28.5+k3s1` | `{{K3S_VERSION}}` |
+| | `K3S_TOKEN` | `my-secret-token` | K3s cluster join token | `prod-k3s-secret-2024` | `{{K3S_TOKEN}}` |
 | **User Credentials** | | | | | |
-| | `{{GITHUB_USERNAME}}` | `YOUR_GITHUB_USERNAME` | Your GitHub username | `johndoe` | |
-| | `{{DOCKERHUB_USERNAME}}` | `YOUR_DOCKERHUB_USERNAME` | Your Docker Hub username | `johndoe` | |
-| | `{{LOCAL_USERNAME}}` | `yourusername` | Your Mac username | `john` | |
+| | `GITHUB_USERNAME` | `YOUR_GITHUB_USERNAME` | Your GitHub username | `johndoe` |`{{GITHUB_USERNAME}}` |
+| | `DOCKERHUB_USERNAME` | `YOUR_DOCKERHUB_USERNAME` | Your Docker Hub username | `johndoe` | `{{DOCKERHUB_USERNAME}}` |
+| | `LOCAL_USERNAME` | `yourusername` | Your Mac username | `john` | `{{LOCAL_USERNAME}}` |
 | **Kubernetes Namespaces** | | | | | |
-| | `{{JENKINS_NAMESPACE}}` | `jenkins` | Jenkins K8s namespace | `ci` | |
-| | `{{ARGOCD_NAMESPACE}}` | `argocd` | Argo CD K8s namespace, use "argocd" for namespace | `cd` | |
-| | `{{APP_NAMESPACE}}` | `hello-gitops` | Application K8s namespace | `flask-demo` | |
+| | `JENKINS_NAMESPACE` | `jenkins` | Jenkins K8s namespace | `ci` | `{{JENKINS_NAMESPACE}}` |
+| | `ARGOCD_NAMESPACE` | `argocd` | Argo CD K8s namespace, use "argocd" for namespace | `cd` | `{{ARGOCD_NAMESPACE}}` |
+| | `APP_NAMESPACE` | `hello-gitops` | Application K8s namespace | `flask-demo` | `{{APP_NAMESPACE}}` |
 | **Docker Images** | | | | | |
-| | `{{JENKINS_IMAGE_NAME}}` | `jenkins-docker-kubectl` | Custom Jenkins image name | `jenkins-custom` | |
-| | `{{APP_IMAGE_NAME}}` | `hello-gitops` | Application image name | `flask-demo` | |
+| | `JENKINS_IMAGE_NAME` | `jenkins-docker-kubectl` | Custom Jenkins image name | `jenkins-custom` | `{{JENKINS_IMAGE_NAME}}` |
+| | `APP_IMAGE_NAME` | `hello-gitops` | Application image name | `flask-demo` | `{{APP_IMAGE_NAME}}` |
 | **File Paths** | | | | | |
-| | `{{PROJECT_BASE_PATH}}` | `~/Desktop/mygitopspipeline` | Project directory path | `~/projects/gitops-lab` | |
+| | `PROJECT_BASE_PATH` | `~/Desktop/mygitopspipeline` | Project directory path | `~/projects/gitops-lab` | `{{PROJECT_BASE_PATH}}` |
 
 ### Port Allocation Strategy
 
@@ -135,6 +143,8 @@ This guide contains two types of `{{...}}` syntax:
 - **30082**: Argo CD HTTPS (secure web interface)
 - **30083**: Argo CD HTTP (web interface) - **RECOMMENDED**
 - **30084**: Application HTTP (demo app)
+- **30090**: Prometheus (metrics & queries)
+- **30300**: Grafana (dashboards)
 
 ### Quick Start: Minimal Required Changes
 
@@ -412,6 +422,7 @@ kubeconfig.*
 kubernetes/jenkins/kubectl
 kubernetes/jenkins/Dockerfile.bak
 
+.gitignore
 
 # If you use Agentic coding tools - modify accordingly - currently set for Cursor as an example
 .cursor/
@@ -478,6 +489,8 @@ echo "Worker Node IP: {{WORKER_NODE_IP}}"
 echo "Jenkins URL: http://{{CONTROL_PLANE_IP}}:{{JENKINS_HTTP_PORT}}"
 echo "Argo CD URL: http://{{CONTROL_PLANE_IP}}:{{ARGOCD_HTTP_PORT}}"
 echo "Application URL: http://{{CONTROL_PLANE_IP}}:{{APP_HTTP_PORT}}"
+echo "Prometheus URL: http://{{CONTROL_PLANE_IP}}:{{PROMETHEUS_HTTP_PORT}}"
+echo "Grafana URL: http://{{CONTROL_PLANE_IP}}:{{GRAFANA_HTTP_PORT}}"
 echo "==========================="
 ```
 
@@ -3309,6 +3322,1317 @@ git push origin main
 
 ---
 
+## Phase 7: Observability & Monitoring
+
+**Objective:** Deploy Prometheus for metrics collection and Grafana for visualization to monitor your GitOps pipeline and applications.
+
+**What You'll Learn:**
+- Deploying monitoring stack using Helm and GitOps
+- Configuring Prometheus to scrape Kubernetes metrics
+- Setting up Grafana dashboards
+- Instrumenting applications for custom metrics
+- Understanding key observability concepts
+
+**Prerequisites:**
+- Phase 6 completed successfully
+- Application pods running and healthy
+- ArgoCD operational
+
+**Time Required:** ~45 minutes
+
+---
+
+### Architecture: Observability Layer
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Kubernetes Cluster                           │
+│                                                                 │
+│  ┌───────────────┐      ┌──────────────┐     ┌──────────────┐ │
+│  │ Applications  │─────▶│ Prometheus   │◀────│   Grafana    │ │
+│  │ (Flask, etc)  │ :9090│ (Metrics DB) │:9090│ (Dashboard)  │ │
+│  └───────────────┘      └──────┬───────┘     └──────────────┘ │
+│         │                      │                    │         │
+│         │ /metrics             │ scrape             │ :3000   │
+│         ▼                      ▼                    ▼         │
+│  ┌───────────────┐      ┌──────────────┐     ┌──────────────┐ │
+│  │ Metrics       │      │ K8s API      │     │ External     │ │
+│  │ Endpoint      │      │ (Node/Pod)   │     │ Access       │ │
+│  └───────────────┘      └──────────────┘     └──────────────┘ │
+│                                                                 │
+│  Namespace: monitoring                                         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Data Flow:**
+1. Applications expose metrics at `/metrics` endpoint
+2. Prometheus scrapes metrics every 15 seconds (configurable)
+3. Prometheus stores time-series data
+4. Grafana queries Prometheus and displays dashboards
+5. Users access Grafana UI via NodePort
+
+---
+
+### Step 7.1: Create Monitoring Namespace
+
+First, create a dedicated namespace for monitoring components:
+
+```bash
+kubectl create namespace monitoring
+
+# Verify
+kubectl get namespaces | grep monitoring
+```
+
+**Expected Output:**
+```
+monitoring        Active   5s
+```
+
+---
+
+### Step 7.2: Install Prometheus with Helm
+
+We'll use Helm (Kubernetes package manager) to simplify Prometheus deployment.
+
+**Step 1: Add Helm Repository**
+
+```bash
+# Add Prometheus community Helm repo
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+
+# Update repo cache
+helm repo update
+
+# Verify repo is added
+helm repo list
+```
+
+**Expected Output:**
+```
+NAME                    URL
+prometheus-community    https://prometheus-community.github.io/helm-charts
+```
+
+**Step 2: Create Prometheus Values File**
+
+Create a custom configuration for Prometheus:
+
+```bash
+cd {{PROJECT_BASE_PATH}}
+mkdir -p kubernetes/monitoring/prometheus
+
+cat > kubernetes/monitoring/prometheus/values.yaml <<'EOF'
+# Prometheus Configuration for GitOps Training
+
+server:
+  # Enable persistent storage (optional - uses hostPath for local dev)
+  persistentVolume:
+    enabled: false
+  
+  # Resource limits
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  
+  # NodePort service for external access
+  service:
+    type: NodePort
+    nodePort: {{PROMETHEUS_HTTP_PORT}}
+  
+  # Retention period
+  retention: "7d"
+  
+  # Global scrape settings
+  global:
+    scrape_interval: 15s
+    evaluation_interval: 15s
+
+# Alertmanager (disabled for training - can enable later)
+alertmanager:
+  enabled: false
+
+# Pushgateway (disabled for training)
+pushgateway:
+  enabled: false
+
+# Node exporter - collects node-level metrics
+prometheus-node-exporter:
+  enabled: true
+  hostNetwork: true
+  hostPID: true
+
+# Kube-state-metrics - exposes K8s object metrics
+kube-state-metrics:
+  enabled: true
+
+# Service monitors for automatic discovery
+serverFiles:
+  prometheus.yml:
+    scrape_configs:
+      # Scrape Prometheus itself
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+      
+      # Kubernetes API server metrics
+      - job_name: 'kubernetes-apiservers'
+        kubernetes_sd_configs:
+          - role: endpoints
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: default;kubernetes;https
+      
+      # Kubernetes nodes (kubelet)
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+          - role: node
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+      
+      # Kubernetes pods (auto-discovery)
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          # Only scrape pods with annotation prometheus.io/scrape: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          # Use custom port if specified
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            target_label: __address__
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+          # Use custom path if specified (default: /metrics)
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+EOF
+```
+
+**Step 3: Install Prometheus**
+
+```bash
+# Install Prometheus using Helm
+helm install prometheus prometheus-community/prometheus \
+  -f kubernetes/monitoring/prometheus/values.yaml \
+  -n monitoring
+
+# Watch deployment progress
+kubectl get pods -n monitoring -w
+```
+
+**Expected Output:**
+```
+NAME                                            READY   STATUS    RESTARTS   AGE
+prometheus-server-xxxxx                         1/1     Running   0          45s
+prometheus-kube-state-metrics-xxxxx             1/1     Running   0          45s
+prometheus-prometheus-node-exporter-xxxxx       1/1     Running   0          45s
+```
+
+Press `Ctrl+C` to stop watching once all pods are Running.
+
+**Step 4: Verify Prometheus Access**
+
+```bash
+# Check service
+kubectl get svc -n monitoring | grep prometheus-server
+
+# Get Prometheus URL
+echo "Prometheus UI: http://{{CONTROL_PLANE_IP}}:{{PROMETHEUS_HTTP_PORT}}"
+```
+
+Open the URL in your browser. You should see the Prometheus web interface.
+
+**Test Query in Prometheus UI:**
+- Go to Graph tab
+- Enter query: `up`
+- Click Execute
+- Should show all scraped targets and their status (1 = up, 0 = down)
+
+---
+
+### Step 7.3: Install Grafana
+
+**Step 1: Add Grafana Helm Repository**
+
+```bash
+# Add Grafana Helm repo
+helm repo add grafana https://grafana.github.io/helm-charts
+
+# Update repo cache
+helm repo update
+
+# Verify
+helm repo list | grep grafana
+```
+
+**Step 2: Create Grafana Values File**
+
+```bash
+mkdir -p kubernetes/monitoring/grafana
+
+cat > kubernetes/monitoring/grafana/values.yaml <<'EOF'
+# Grafana Configuration for GitOps Training
+
+# Admin credentials
+adminUser: admin
+adminPassword: admin123  # Change in production!
+
+# Service configuration
+service:
+  type: NodePort
+  nodePort: {{GRAFANA_HTTP_PORT}}
+
+# Resource limits
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Persistence (disabled for training)
+persistence:
+  enabled: false
+
+# Data sources - Prometheus
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-server:80
+        access: proxy
+        isDefault: true
+        editable: true
+
+# Pre-installed dashboards
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+# Import popular community dashboards
+dashboards:
+  default:
+    # Kubernetes cluster monitoring
+    kubernetes-cluster:
+      gnetId: 7249
+      revision: 1
+      datasource: Prometheus
+    
+    # Node metrics
+    node-exporter:
+      gnetId: 1860
+      revision: 27
+      datasource: Prometheus
+    
+    # Pod metrics
+    kubernetes-pods:
+      gnetId: 6417
+      revision: 1
+      datasource: Prometheus
+
+# Grafana configuration
+grafana.ini:
+  server:
+    root_url: "http://{{CONTROL_PLANE_IP}}:{{GRAFANA_HTTP_PORT}}"
+  analytics:
+    check_for_updates: false
+  log:
+    mode: console
+  security:
+    allow_embedding: true
+EOF
+```
+
+**Step 3: Install Grafana**
+
+```bash
+# Install Grafana using Helm
+helm install grafana grafana/grafana \
+  -f kubernetes/monitoring/grafana/values.yaml \
+  -n monitoring
+
+# Watch deployment
+kubectl get pods -n monitoring -w
+```
+
+**Expected Output:**
+```
+NAME                                            READY   STATUS    RESTARTS   AGE
+grafana-xxxxx                                   1/1     Running   0          30s
+prometheus-server-xxxxx                         1/1     Running   0          5m
+prometheus-kube-state-metrics-xxxxx             1/1     Running   0          5m
+prometheus-prometheus-node-exporter-xxxxx       1/1     Running   0          5m
+```
+
+Press `Ctrl+C` to stop watching.
+
+**Step 4: Access Grafana**
+
+```bash
+# Get Grafana service details
+kubectl get svc -n monitoring | grep grafana
+
+# Display access information
+echo "Grafana URL: http://{{CONTROL_PLANE_IP}}:{{GRAFANA_HTTP_PORT}}"
+echo "Username: admin"
+echo "Password: admin123"
+```
+
+Open the URL in your browser and login with the credentials.
+
+---
+
+### Step 7.4: Verify Monitoring Stack
+
+**Check All Components:**
+
+```bash
+# View all monitoring resources
+kubectl get all -n monitoring
+
+# Check Prometheus targets (via kubectl port-forward alternative)
+kubectl get endpoints -n monitoring
+```
+
+**Expected Resources:**
+- 4 pods running (Prometheus server, kube-state-metrics, node-exporter, Grafana)
+- 4+ services
+- 4 deployments/daemonsets
+
+**Prometheus Targets Check:**
+
+```bash
+# Get Prometheus pod name
+PROM_POD=$(kubectl get pod -n monitoring -l app.kubernetes.io/name=prometheus,app.kubernetes.io/component=server -o jsonpath='{.items[0].metadata.name}')
+
+# Check targets via API
+kubectl exec -n monitoring $PROM_POD -c prometheus-server -- wget -qO- http://localhost:9090/api/v1/targets | grep -o '"health":"[^"]*"' | head -10
+```
+
+Should show targets with `"health":"up"` status.
+
+---
+
+### Step 7.5: Explore Pre-Installed Dashboards
+
+Once logged into Grafana (http://{{CONTROL_PLANE_IP}}:{{GRAFANA_HTTP_PORT}}):
+
+**1. Navigate to Dashboards:**
+- Click "Dashboards" icon (four squares) in left sidebar
+- You'll see three pre-imported dashboards
+
+**2. Kubernetes Cluster Dashboard (ID: 7249):**
+- Shows cluster-wide metrics
+- CPU/Memory usage by namespace
+- Pod count and status
+- Network I/O
+
+**3. Node Exporter Dashboard (ID: 1860):**
+- Physical node metrics
+- CPU, RAM, disk, network per node
+- System load and uptime
+
+**4. Kubernetes Pods Dashboard (ID: 6417):**
+- Per-pod resource usage
+- Container restarts
+- CPU throttling
+
+**Validation:**
+- All dashboards should show data within 1-2 minutes
+- If "No Data", check Prometheus data source connection
+
+---
+
+### Step 7.6: Instrument Your Flask Application
+
+To collect custom metrics from your Flask application, follow these steps:
+
+**Step 1: Update Flask Application Code**
+
+In your `{{PROJECT_NAME}}-flaskapp` repository, add Prometheus instrumentation:
+
+```bash
+# Clone or navigate to your Flask app repo
+cd ~/Desktop/{{PROJECT_NAME}}-flaskapp
+
+# Add prometheus_client to requirements.txt
+echo "prometheus-client==0.19.0" >> requirements.txt
+```
+
+Update `app.py` to expose metrics:
+
+```python
+from flask import Flask, jsonify
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+import time
+import os
+
+app = Flask(__name__)
+
+# Define Prometheus metrics
+request_count = Counter(
+    'flask_app_requests_total',
+    'Total Flask requests',
+    ['method', 'endpoint', 'status']
+)
+
+request_duration = Histogram(
+    'flask_app_request_duration_seconds',
+    'Flask request duration',
+    ['method', 'endpoint']
+)
+
+@app.before_request
+def before_request():
+    # Store request start time
+    from flask import g
+    g.start_time = time.time()
+
+@app.after_request
+def after_request(response):
+    # Record metrics after each request
+    from flask import request, g
+    
+    if hasattr(g, 'start_time'):
+        duration = time.time() - g.start_time
+        request_duration.labels(
+            method=request.method,
+            endpoint=request.endpoint or 'unknown'
+        ).observe(duration)
+    
+    request_count.labels(
+        method=request.method,
+        endpoint=request.endpoint or 'unknown',
+        status=response.status_code
+    ).inc()
+    
+    return response
+
+@app.route('/')
+def home():
+    # Load secrets from Vault
+    app_secret = os.getenv('APP_SECRET', 'NOT_SET')
+    environment = os.getenv('ENVIRONMENT', 'NOT_SET')
+    
+    return jsonify({
+        "message": "Hello from GitOps Pipeline!",
+        "version": "2.0.0",
+        "environment": environment,
+        "secret_loaded": app_secret != 'NOT_SET'
+    })
+
+@app.route('/health')
+def health():
+    return jsonify({"status": "healthy"}), 200
+
+@app.route('/metrics')
+def metrics():
+    """Prometheus metrics endpoint"""
+    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+```
+
+**Step 2: Update Deployment to Enable Scraping**
+
+In `{{PROJECT_NAME}}-manifests/{{APP_NAME}}/deployment.yaml`, add Prometheus annotations:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{APP_NAME}}
+  namespace: {{APP_NAMESPACE}}
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: {{APP_NAME}}
+  template:
+    metadata:
+      labels:
+        app: {{APP_NAME}}
+      annotations:
+        # Prometheus scraping configuration
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5000"
+        prometheus.io/path: "/metrics"
+        # ... existing Vault annotations ...
+```
+
+**Step 3: Trigger GitOps Pipeline**
+
+```bash
+# Commit Flask app changes
+cd ~/Desktop/{{PROJECT_NAME}}-flaskapp
+git add requirements.txt app.py
+git commit -m "feat: add Prometheus metrics instrumentation"
+git push origin main
+
+# Commit manifest changes
+cd ~/Desktop/{{PROJECT_NAME}}-manifests/{{APP_NAME}}
+git add deployment.yaml
+git commit -m "feat: enable Prometheus scraping annotations"
+git push origin main
+```
+
+**Step 4: Trigger Jenkins Build**
+
+```bash
+# The build should auto-trigger via webhook, or manually trigger in Jenkins UI
+# Wait for Jenkins to build and push new image
+# ArgoCD will detect manifest changes and sync automatically
+```
+
+**Step 5: Verify Metrics Endpoint**
+
+```bash
+# Wait for new pods to be running
+kubectl get pods -n {{APP_NAMESPACE}}
+
+# Get a pod name
+POD_NAME=$(kubectl get pod -n {{APP_NAMESPACE}} -l app={{APP_NAME}} -o jsonpath='{.items[0].metadata.name}')
+
+# Test metrics endpoint
+kubectl exec -n {{APP_NAMESPACE}} $POD_NAME -c {{APP_NAME}} -- wget -qO- http://localhost:5000/metrics
+```
+
+**Expected Output:**
+```
+# HELP flask_app_requests_total Total Flask requests
+# TYPE flask_app_requests_total counter
+flask_app_requests_total{endpoint="health",method="GET",status="200"} 5.0
+flask_app_requests_total{endpoint="home",method="GET",status="200"} 12.0
+
+# HELP flask_app_request_duration_seconds Flask request duration
+# TYPE flask_app_request_duration_seconds histogram
+flask_app_request_duration_seconds_bucket{endpoint="home",method="GET",le="0.005"} 10.0
+...
+```
+
+---
+
+### Step 7.7: Create Custom Grafana Dashboard
+
+**Step 1: Access Grafana UI**
+
+Open http://{{CONTROL_PLANE_IP}}:{{GRAFANA_HTTP_PORT}} and login (admin/admin123)
+
+**Step 2: Verify Prometheus Data Source**
+
+- Go to **Configuration** (gear icon) → **Data Sources**
+- Click **Prometheus**
+- Scroll down and click **Save & Test**
+- Should show: "Data source is working"
+
+**Step 3: Create Dashboard for Flask App**
+
+1. Click **+** icon → **Create Dashboard**
+2. Click **Add visualization**
+3. Select **Prometheus** data source
+
+**Panel 1: Request Rate**
+
+- Metric: `rate(flask_app_requests_total[5m])`
+- Panel title: "Flask Requests per Second"
+- Visualization: Graph
+- Description: Shows request rate over time
+
+**Panel 2: Error Rate**
+
+- Metric: `rate(flask_app_requests_total{status=~"5.."}[5m])`
+- Panel title: "Error Rate (5xx)"
+- Visualization: Graph
+- Set alert threshold (optional)
+
+**Panel 3: Request Duration (p95)**
+
+- Metric: `histogram_quantile(0.95, rate(flask_app_request_duration_seconds_bucket[5m]))`
+- Panel title: "95th Percentile Latency"
+- Visualization: Graph
+- Unit: seconds
+
+**Panel 4: Pod Status**
+
+- Metric: `kube_pod_status_phase{namespace="{{APP_NAMESPACE}}"}`
+- Panel title: "Pod Health Status"
+- Visualization: Stat
+
+**Step 4: Save Dashboard**
+
+- Click **Save** icon (top right)
+- Name: "Flask Application Metrics"
+- Click **Save**
+
+---
+
+### Step 7.8: Generate Test Traffic
+
+To see metrics in action, generate some load:
+
+```bash
+# Generate 100 requests to Flask app
+for i in {1..100}; do
+  curl -s http://{{CONTROL_PLANE_IP}}:{{APP_HTTP_PORT}}/ > /dev/null
+  echo "Request $i completed"
+  sleep 0.5
+done
+```
+
+**Monitor in Grafana:**
+- Refresh your dashboard
+- Should see request rate spike
+- Response time metrics updating
+- Pod metrics showing CPU/memory usage
+
+---
+
+### Step 7.9: Explore Key Metrics
+
+**In Prometheus UI (http://{{CONTROL_PLANE_IP}}:{{PROMETHEUS_HTTP_PORT}}):**
+
+Try these useful queries:
+
+```promql
+# CPU usage per pod
+sum(rate(container_cpu_usage_seconds_total[5m])) by (pod)
+
+# Memory usage per namespace
+sum(container_memory_usage_bytes) by (namespace)
+
+# Pod restart count
+kube_pod_container_status_restarts_total
+
+# Number of running pods per namespace
+count(kube_pod_info) by (namespace)
+
+# Node CPU usage
+100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+
+# Disk usage percentage
+(node_filesystem_size_bytes - node_filesystem_avail_bytes) / node_filesystem_size_bytes * 100
+```
+
+**Understanding PromQL Basics:**
+
+- `rate()` - Calculate per-second rate over time window
+- `sum()` - Aggregate values
+- `by (label)` - Group results by label
+- `[5m]` - Look back 5 minutes
+- Operators: `+`, `-`, `*`, `/`, `>`, `<`, `==`
+
+---
+
+### Step 7.10: Set Up Alerts (Optional)
+
+Prometheus can alert on conditions. Example alert for pod restarts:
+
+**Step 1: Create Alert Rules**
+
+```bash
+cat > kubernetes/monitoring/prometheus/alert-rules.yaml <<'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alerts
+  namespace: monitoring
+data:
+  alerts.yml: |
+    groups:
+      - name: pod_alerts
+        interval: 30s
+        rules:
+          - alert: PodRestartingTooMuch
+            expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Pod {{ $labels.pod }} is restarting"
+              description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted {{ $value }} times in the last 15 minutes"
+          
+          - alert: PodNotReady
+            expr: kube_pod_status_phase{phase!="Running"} > 0
+            for: 10m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Pod {{ $labels.pod }} not ready"
+              description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been in {{ $labels.phase }} state for more than 10 minutes"
+EOF
+
+# Apply alert rules
+kubectl apply -f kubernetes/monitoring/prometheus/alert-rules.yaml
+```
+
+**Step 2: View Alerts in Prometheus**
+
+- Open Prometheus UI: http://{{CONTROL_PLANE_IP}}:{{PROMETHEUS_HTTP_PORT}}
+- Click **Alerts** tab
+- Should see your configured alerts
+
+---
+
+### Step 7.11: GitOps-ify the Monitoring Stack (Advanced)
+
+For true GitOps, convert Helm deployments to ArgoCD Applications:
+
+**Step 1: Generate Manifests from Helm**
+
+```bash
+cd ~/Desktop/{{PROJECT_NAME}}-manifests
+mkdir -p monitoring/prometheus monitoring/grafana
+
+# Generate Prometheus manifests
+helm template prometheus prometheus-community/prometheus \
+  -f {{PROJECT_BASE_PATH}}/kubernetes/monitoring/prometheus/values.yaml \
+  -n monitoring > monitoring/prometheus/manifests.yaml
+
+# Generate Grafana manifests
+helm template grafana grafana/grafana \
+  -f {{PROJECT_BASE_PATH}}/kubernetes/monitoring/grafana/values.yaml \
+  -n monitoring > monitoring/grafana/manifests.yaml
+
+# Commit to Git
+git add monitoring/
+git commit -m "feat: add Prometheus and Grafana monitoring manifests"
+git push origin main
+```
+
+**Step 2: Create ArgoCD Application**
+
+```bash
+cd {{PROJECT_BASE_PATH}}
+
+cat > kubernetes/applications/monitoring-prometheus.yaml <<'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/{{GITHUB_USERNAME}}/{{PROJECT_NAME}}-manifests.git
+    targetRevision: main
+    path: monitoring/prometheus
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+EOF
+
+cat > kubernetes/applications/monitoring-grafana.yaml <<'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/{{GITHUB_USERNAME}}/{{PROJECT_NAME}}-manifests.git
+    targetRevision: main
+    path: monitoring/grafana
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+EOF
+
+# Apply ArgoCD applications
+kubectl apply -f kubernetes/applications/monitoring-prometheus.yaml
+kubectl apply -f kubernetes/applications/monitoring-grafana.yaml
+```
+
+Now your monitoring stack is managed by ArgoCD!
+
+---
+
+### Step 7.12: Validation Checklist
+
+**Prometheus Validation:**
+
+```bash
+# 1. Verify Prometheus is running
+kubectl get pods -n monitoring -l app.kubernetes.io/name=prometheus
+
+# 2. Check Prometheus targets
+curl -s http://{{CONTROL_PLANE_IP}}:{{PROMETHEUS_HTTP_PORT}}/api/v1/targets | grep -o '"health":"up"' | wc -l
+# Should show multiple targets (>5)
+
+# 3. Query test metrics
+curl -s 'http://{{CONTROL_PLANE_IP}}:{{PROMETHEUS_HTTP_PORT}}/api/v1/query?query=up' | grep -o '"status":"success"'
+```
+
+**Grafana Validation:**
+
+```bash
+# 1. Verify Grafana is running
+kubectl get pods -n monitoring -l app.kubernetes.io/name=grafana
+
+# 2. Check service
+kubectl get svc -n monitoring grafana
+
+# 3. Test dashboard access
+curl -s http://{{CONTROL_PLANE_IP}}:{{GRAFANA_HTTP_PORT}}/login | grep -o "Grafana" | head -1
+# Should output: Grafana
+```
+
+**Application Metrics Validation:**
+
+```bash
+# 1. Get Flask pod
+POD_NAME=$(kubectl get pod -n {{APP_NAMESPACE}} -l app={{APP_NAME}} -o jsonpath='{.items[0].metadata.name}')
+
+# 2. Check metrics endpoint exists
+kubectl exec -n {{APP_NAMESPACE}} $POD_NAME -c {{APP_NAME}} -- wget -qO- http://localhost:5000/metrics | head -20
+
+# 3. Verify Prometheus is scraping Flask pods
+curl -s http://{{CONTROL_PLANE_IP}}:{{PROMETHEUS_HTTP_PORT}}/api/v1/targets | grep "{{APP_NAMESPACE}}"
+```
+
+**Expected Results:**
+- ✅ Prometheus accessible at port {{PROMETHEUS_HTTP_PORT}} (default: 30090)
+- ✅ Grafana accessible at port {{GRAFANA_HTTP_PORT}} (default: 30300)
+- ✅ Pre-installed dashboards showing data
+- ✅ Flask metrics visible in Prometheus
+- ✅ All targets showing "up" status
+
+---
+
+### Understanding the Monitoring Stack
+
+**Key Concepts:**
+
+**1. Metrics Types:**
+- **Counter:** Only goes up (e.g., total requests)
+- **Gauge:** Can go up/down (e.g., current CPU usage)
+- **Histogram:** Distributions (e.g., request latency buckets)
+- **Summary:** Similar to histogram, pre-calculated quantiles
+
+**2. Labels:**
+Labels add dimensions to metrics:
+```promql
+flask_app_requests_total{method="GET", endpoint="home", status="200"}
+```
+Allows filtering and grouping by method, endpoint, status, etc.
+
+**3. Scraping:**
+Prometheus "pulls" metrics from targets on schedule:
+- Default: Every 15 seconds
+- Configured in `scrape_interval`
+- Targets auto-discovered via Kubernetes API
+
+**4. Service Discovery:**
+Prometheus automatically finds:
+- Pods with `prometheus.io/scrape: "true"` annotation
+- Kubernetes API endpoints
+- Nodes (via node-exporter)
+- Services (via service discovery)
+
+**5. Retention:**
+- Metrics stored for configured period (default: 7 days in our setup)
+- Older data automatically deleted
+- For longer retention, use persistent storage
+
+**6. PromQL Query Examples:**
+
+```promql
+# Average CPU across all pods
+avg(rate(container_cpu_usage_seconds_total[5m]))
+
+# 95th percentile request latency
+histogram_quantile(0.95, rate(flask_app_request_duration_seconds_bucket[5m]))
+
+# Top 5 pods by memory usage
+topk(5, sum(container_memory_usage_bytes) by (pod))
+
+# Request rate by endpoint
+sum(rate(flask_app_requests_total[5m])) by (endpoint)
+
+# Error rate percentage
+sum(rate(flask_app_requests_total{status=~"5.."}[5m])) 
+/ 
+sum(rate(flask_app_requests_total[5m])) * 100
+```
+
+---
+
+### Common Monitoring Patterns
+
+**1. RED Method (for Services):**
+- **R**ate: Request rate (requests per second)
+- **E**rrors: Error rate (failed requests)
+- **D**uration: Request latency (response time)
+
+Example queries:
+```promql
+# Rate
+sum(rate(flask_app_requests_total[5m]))
+
+# Errors
+sum(rate(flask_app_requests_total{status=~"5.."}[5m]))
+
+# Duration (95th percentile)
+histogram_quantile(0.95, rate(flask_app_request_duration_seconds_bucket[5m]))
+```
+
+**2. USE Method (for Resources):**
+- **U**tilization: % of resource used
+- **S**aturation: Amount of queued work
+- **E**rrors: Error count
+
+Example queries:
+```promql
+# CPU Utilization
+100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+
+# Memory Utilization
+(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100
+
+# Disk saturation
+node_disk_io_time_weighted_seconds_total
+```
+
+**3. The Four Golden Signals:**
+- Latency: Time to serve requests
+- Traffic: Demand on the system
+- Errors: Rate of failed requests
+- Saturation: How "full" the service is
+
+---
+
+### Monitoring Dashboard Best Practices
+
+**1. Dashboard Organization:**
+```
+Top Row: High-level KPIs (SLIs)
+  - Request rate, error rate, latency
+  - Single-number stat panels
+
+Middle Rows: Detailed Metrics
+  - Time-series graphs
+  - Per-endpoint breakdown
+  - Resource usage trends
+
+Bottom Row: Infrastructure
+  - Node health
+  - Pod status
+  - Network metrics
+```
+
+**2. Time Ranges:**
+- Default: Last 15 minutes (for active debugging)
+- Production: Last 24 hours
+- Always enable auto-refresh (5s-30s)
+
+**3. Useful Variables:**
+Create dashboard variables for filtering:
+- `$namespace` - Filter by namespace
+- `$pod` - Filter by pod name
+- `$endpoint` - Filter by API endpoint
+
+**4. Color Coding:**
+- Green: Good (< 200ms latency, < 1% errors)
+- Yellow: Warning (200-500ms, 1-5% errors)
+- Red: Critical (> 500ms, > 5% errors)
+
+---
+
+### Troubleshooting Monitoring Stack
+
+**Issue 1: Grafana Shows "No Data"**
+
+**Symptoms:**
+- Dashboards are empty
+- "No data" message in panels
+
+**Resolution:**
+
+```bash
+# Step 1: Check Prometheus data source
+kubectl logs -n monitoring -l app.kubernetes.io/name=grafana | grep -i prometheus
+
+# Step 2: Test Prometheus connectivity from Grafana pod
+GRAFANA_POD=$(kubectl get pod -n monitoring -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n monitoring $GRAFANA_POD -- wget -qO- http://prometheus-server:80/api/v1/query?query=up
+
+# Step 3: Verify Prometheus service
+kubectl get svc -n monitoring prometheus-server
+```
+
+**Issue 2: Prometheus Not Scraping Flask Pods**
+
+**Symptoms:**
+- Flask metrics not appearing in Prometheus
+- Targets page doesn't show {{APP_NAMESPACE}} pods
+
+**Resolution:**
+
+```bash
+# Step 1: Verify annotations on pods
+kubectl get pod -n {{APP_NAMESPACE}} -o yaml | grep -A 3 "prometheus.io"
+
+# Step 2: Test metrics endpoint directly
+POD_NAME=$(kubectl get pod -n {{APP_NAMESPACE}} -l app={{APP_NAME}} -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n {{APP_NAMESPACE}} $POD_NAME -c {{APP_NAME}} -- wget -qO- localhost:5000/metrics
+
+# Step 3: Check Prometheus config
+kubectl get configmap -n monitoring prometheus-server -o yaml | grep -A 10 "kubernetes-pods"
+
+# Step 4: Reload Prometheus configuration
+kubectl delete pod -n monitoring -l app.kubernetes.io/name=prometheus
+```
+
+**Issue 3: High Memory Usage by Prometheus**
+
+**Symptoms:**
+- Prometheus pod OOMKilled or restarting
+- High memory consumption
+
+**Resolution:**
+
+```bash
+# Option 1: Reduce retention period
+helm upgrade prometheus prometheus-community/prometheus \
+  --set server.retention=3d \
+  -n monitoring
+
+# Option 2: Reduce scrape frequency
+helm upgrade prometheus prometheus-community/prometheus \
+  --set server.global.scrape_interval=30s \
+  -n monitoring
+
+# Option 3: Increase resource limits
+helm upgrade prometheus prometheus-community/prometheus \
+  --set server.resources.limits.memory=2Gi \
+  -n monitoring
+```
+
+---
+
+### Monitoring Architecture Decisions
+
+**Why This Design:**
+
+**1. Helm vs Manual Manifests**
+- **Chose:** Helm charts
+- **Reason:** Production-tested configurations, easier updates
+- **Tradeoff:** Less control, more abstraction
+- **Alternative:** Write all YAML manually for learning
+
+**2. NodePort vs LoadBalancer**
+- **Chose:** NodePort (30090, 30300)
+- **Reason:** Works in local/Multipass environment
+- **Tradeoff:** Less convenient than cloud LoadBalancer
+- **Production:** Use Ingress + TLS
+
+**3. No Persistent Storage**
+- **Chose:** Disabled persistence
+- **Reason:** Training environment, simplifies setup
+- **Tradeoff:** Metrics lost on pod restart
+- **Production:** Enable PersistentVolumes
+
+**4. Single Prometheus Instance**
+- **Chose:** One Prometheus server
+- **Reason:** Sufficient for small cluster
+- **Tradeoff:** Single point of failure
+- **Production:** Deploy HA setup (2+ replicas) with Thanos
+
+**5. Basic Auth for Grafana**
+- **Chose:** Simple admin/password
+- **Reason:** Quick setup for training
+- **Tradeoff:** Less secure
+- **Production:** Use OAuth/LDAP/SSO
+
+---
+
+### Key Takeaways
+
+**What You Learned:**
+
+1. **Metrics Collection Architecture**
+   - Pull-based model (Prometheus scrapes targets)
+   - Service discovery (automatic target detection)
+   - Time-series storage
+
+2. **Instrumentation**
+   - Adding Prometheus client library
+   - Exposing `/metrics` endpoint
+   - Using annotations for discovery
+
+3. **Visualization**
+   - Connecting Grafana to Prometheus
+   - Creating custom dashboards
+   - Using PromQL queries
+
+4. **GitOps Integration**
+   - Helm charts as manifest source
+   - ArgoCD managing monitoring stack
+   - Infrastructure as code principles
+
+5. **Observability Fundamentals**
+   - RED method for services
+   - USE method for resources
+   - Four Golden Signals
+
+**Production Enhancements:**
+
+For production environments, consider:
+- **Persistent storage** for metrics (PVC with cloud storage)
+- **High availability** Prometheus (multiple replicas + Thanos)
+- **Alertmanager** for alert routing (PagerDuty, Slack, email)
+- **Distributed tracing** (Jaeger, Tempo) for request flows
+- **Log aggregation** (Loki, ELK) for centralized logging
+- **Security:** TLS, authentication, RBAC
+- **Long-term storage:** Thanos, Cortex, or Mimir for metrics
+- **SLO/SLA tracking** with error budgets
+
+---
+
+### Next Steps
+
+**After completing Phase 7:**
+
+1. **Explore Dashboards:**
+   - Import community dashboards from https://grafana.com/grafana/dashboards/
+   - Popular: 315 (cluster overview), 1860 (node exporter), 6417 (pods)
+
+2. **Add More Metrics:**
+   - Jenkins build metrics (via Prometheus plugin)
+   - ArgoCD sync metrics (built-in Prometheus endpoint)
+   - Custom business metrics in your app
+
+3. **Learn PromQL:**
+   - Practice queries in Prometheus UI
+   - Experiment with aggregations and functions
+   - Build complex multi-metric calculations
+
+4. **Configure Alerts:**
+   - Set up Alertmanager
+   - Create meaningful alert rules
+   - Avoid alert fatigue with proper thresholds
+
+5. **Advanced Observability:**
+   - Add distributed tracing (Jaeger)
+   - Implement centralized logging (Loki)
+   - Correlate metrics, logs, and traces
+
+**Continue to:** [Teardown & Cleanup](#teardown--cleanup) when ready to clean up your environment.
+
+---
+
+### Quick Reference: Monitoring URLs
+
+After completing Phase 7, you'll have:
+
+| Service | URL | Credentials | Purpose |
+|---------|-----|-------------|---------|
+| **Prometheus** | http://{{CONTROL_PLANE_IP}}:{{PROMETHEUS_HTTP_PORT}} | None | Metrics database & query interface |
+| **Grafana** | http://{{CONTROL_PLANE_IP}}:{{GRAFANA_HTTP_PORT}} | admin/admin123 | Dashboards & visualization |
+| **Flask Metrics** | http://{{CONTROL_PLANE_IP}}:{{APP_HTTP_PORT}}/metrics | None | Application metrics endpoint |
+
+**Prometheus UI Tabs:**
+- **Graph:** Execute PromQL queries and visualize
+- **Alerts:** View configured alert rules and firing alerts
+- **Status → Targets:** See all scrape targets and health
+- **Status → Configuration:** View current Prometheus config
+
+**Grafana Navigation:**
+- **Home:** Dashboard list
+- **Explore:** Ad-hoc PromQL queries (like Prometheus Graph)
+- **Alerting:** Alert rules and notifications
+- **Configuration:** Data sources, users, preferences
+
+---
+
+### Resource Requirements
+
+Adding Prometheus and Grafana will consume additional resources:
+
+**CPU:**
+- Prometheus: ~200-500m (0.2-0.5 cores)
+- Grafana: ~100-500m (0.1-0.5 cores)
+- Node Exporter: ~50m per node
+- Kube-state-metrics: ~100m
+- **Total:** ~500m-1200m additional CPU
+
+**Memory:**
+- Prometheus: ~512Mi-1Gi (grows with metrics volume)
+- Grafana: ~256Mi-512Mi
+- Node Exporter: ~30Mi per node
+- Kube-state-metrics: ~100Mi
+- **Total:** ~900Mi-1.7Gi additional memory
+
+**Disk:**
+- Prometheus: ~1-5Gi (depends on retention period)
+- Grafana: ~100Mi
+- **Total:** ~1-5Gi (if using persistent storage)
+
+**Verify Cluster Capacity:**
+
+```bash
+# Check available node resources
+kubectl top nodes
+
+# Check current resource usage
+kubectl top pods -A
+
+# View resource requests/limits
+kubectl describe nodes | grep -A 5 "Allocated resources"
+```
+
+If resources are tight, consider:
+- Reducing Prometheus retention period
+- Decreasing scrape interval (30s instead of 15s)
+- Disabling node-exporter or kube-state-metrics temporarily
+- Adjusting resource limits in values files
+
+---
+
 ## Teardown & Cleanup
 
 **When you're ready to purge everything:**
@@ -3324,6 +4648,7 @@ kubectl delete namespace {{APP_NAMESPACE}}
 kubectl delete namespace {{JENKINS_NAMESPACE}}
 kubectl delete namespace {{ARGOCD_NAMESPACE}}
 kubectl delete namespace vault
+kubectl delete namespace monitoring
 
 # Step 3: Wait for all resources to be deleted
 kubectl get all -A
@@ -4100,18 +5425,18 @@ This ensures secrets and configurations survive restarts.
 
 **Once you've mastered the core GitOps pipeline, consider these advanced topics:**
 
-### Level 1: Observability & Monitoring
-- Prometheus for metrics collection
-- Grafana for visualization
-- Alertmanager for alerting
+### Level 1: Advanced Observability
+- Alertmanager for alert routing and management
+- Distributed tracing with Jaeger or Tempo
 - Log aggregation with Loki or ELK stack
+- Correlating metrics, logs, and traces
 
 ### Level 2: Security Hardening
-- Sealed Secrets for secrets management
-- Vault integration for dynamic secrets
 - Network policies for pod isolation
 - OPA/Gatekeeper for policy enforcement
 - Trivy or Clair for container scanning
+- RBAC fine-tuning and least privilege
+- Sealed Secrets as alternative to Vault
 
 ### Level 3: High Availability & Resilience
 - Multi-node control plane (3+ servers)
@@ -4162,6 +5487,8 @@ This ensures secrets and configurations survive restarts.
 | Argo CD (HTTP) | http://{{CONTROL_PLANE_IP}}:{{ARGOCD_HTTP_PORT}} | admin / (from secret) |
 | Argo CD (HTTPS) | https://{{CONTROL_PLANE_IP}}:{{ARGOCD_HTTPS_PORT}} | admin / (from secret) |
 | {{APP_NAME}} | http://{{CONTROL_PLANE_IP}}:{{APP_HTTP_PORT}} | N/A |
+| Prometheus | http://{{CONTROL_PLANE_IP}}:{{PROMETHEUS_HTTP_PORT}} | N/A |
+| Grafana | http://{{CONTROL_PLANE_IP}}:{{GRAFANA_HTTP_PORT}} | admin / admin123 |
 
 ### Important File Locations
 
@@ -4220,6 +5547,8 @@ kubectl delete pod POD_NAME -n NAMESPACE
 - ✅ Continuous Integration (Jenkins with Kubernetes agents)
 - ✅ **Rootless Image Builds (Kaniko)** 🔒
 - ✅ Continuous Deployment (Argo CD)
+- ✅ Secret Management (HashiCorp Vault)
+- ✅ Observability & Monitoring (Prometheus & Grafana)
 - ✅ Sample Application (Flask)
 - ✅ Complete GitOps Workflow
 
@@ -4230,6 +5559,9 @@ kubectl delete pod POD_NAME -n NAMESPACE
 - **Production-grade CI/CD pipeline design**
 - **Kubernetes-native build workflows**
 - **Security best practices (rootless builds)**
+- Secret management and dynamic injection
+- Observability and monitoring
+- Metrics collection and visualization
 - GitOps principles
 - Kubernetes operations
 - Troubleshooting and debugging
