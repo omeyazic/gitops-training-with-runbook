@@ -193,7 +193,7 @@ A complete local GitOps pipeline demonstrating enterprise-grade CI/CD practices:
 │  │  ┌──────────────────────────────────────────────┐     │              │
 │  │  │    {{WORKER_HOSTNAME}} ({{WORKER_NODE_IP}})  │     │              │
 │  │  │  ┌────────────┐  ┌──────────┐  ┌──────────┐  │     │              │
-│  │  │  │  flaskapp  │  │   K3s    │  │  Docker  │  │     │              │
+│  │  │  │  {{APP_NAME}}  │  │   K3s    │  │  Docker  │  │     │              │
 │  │  │  │   (App)    │  │  Agent   │  │          │  │     │              │
 │  │  │  └────────────┘  └──────────┘  └──────────┘  │     │              │
 │  │  └──────────────────────────────────────────────┘     │              │
@@ -203,7 +203,7 @@ A complete local GitOps pipeline demonstrating enterprise-grade CI/CD practices:
 │  │              Git Repositories (GitHub)                           │   │
 │  │  ┌──────────────────┐  ┌──────────────────┐  ┌─────────────────┐ │   │
 │  │  │{{PROJECT_NAME}}  │  │{{PROJECT_NAME}}- │  │{{PROJECT_NAME}}-│ │   │
-│  │  │(Infrastructure)  |  |flaskapp (App)    │  │ manifests       │ │   │
+│  │  │(Infrastructure)  |  |{{APP_NAME}} (App)    │  │ manifests       │ │   │
 │  │  └──────────────────┘  └──────────────────┘  └─────────────────┘ │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -2090,17 +2090,17 @@ vault write auth/kubernetes/config \
     kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443"
 
 # Create policy for app secrets
-vault policy write flaskapp-policy - <<EOF
-path "secret/data/flaskapp/*" {
+vault policy write {{APP_NAME}}-policy - <<EOF
+path "secret/data/{{APP_NAME}}/*" {
   capabilities = ["read"]
 }
 EOF
 
 # Create role binding policy to Service Account
-vault write auth/kubernetes/role/flaskapp \
+vault write auth/kubernetes/role/{{APP_NAME}} \
     bound_service_account_names=default \
     bound_service_account_namespaces={{APP_NAMESPACE}} \
-    policies=flaskapp-policy \
+    policies={{APP_NAME}}-policy \
     ttl=24h
 ```
 
@@ -2114,7 +2114,7 @@ exit
 
 **What this does:**
 - Pods in `{{APP_NAMESPACE}}` with `default` SA can authenticate to Vault
-- They can read secrets from `secret/flaskapp/*` path only
+- They can read secrets from `secret/{{APP_NAME}}/*` path only
 - Access tokens expire after 24 hours
 
 ```mermaid
@@ -2135,12 +2135,12 @@ sequenceDiagram
         Pod->>Vault: Authenticate with JWT token
         Vault->>K8sAPI: Verify token validity
         K8sAPI-->>Vault: Token valid ✓
-        Vault->>Role: Check role: flaskapp<br/>SA=default? ✓<br/>Namespace={{APP_NAMESPACE}}? ✓
+        Vault->>Role: Check role: {{APP_NAME}}<br/>SA=default? ✓<br/>Namespace={{APP_NAMESPACE}}? ✓
         Role-->>Vault: Authorization granted
-        Vault->>Policy: Check flaskapp-policy permissions
-        Policy-->>Vault: Can read secret/data/flaskapp/*
+        Vault->>Policy: Check {{APP_NAME}}-policy permissions
+        Policy-->>Vault: Can read secret/data/{{APP_NAME}}/*
         Vault-->>Pod: Return Vault token (TTL: 24h)
-        Pod->>Vault: Request secret from secret/flaskapp/*
+        Pod->>Vault: Request secret from secret/{{APP_NAME}}/*
         Vault->>Policy: Verify read permission
         Policy-->>Vault: Allowed ✓
         Vault-->>Pod: Return secret data
@@ -2156,13 +2156,13 @@ sequenceDiagram
 ```bash
 # Write application secrets to Vault
 kubectl exec -it vault-0 -n vault -- \
-  vault kv put secret/flaskapp/config \
+  vault kv put secret/{{APP_NAME}}/config \
   app_secret="ProductionSecretValue2024" \
   environment="production"
 
 # Verify (optional)
 kubectl exec -it vault-0 -n vault -- \
-  vault kv get secret/flaskapp/config
+  vault kv get secret/{{APP_NAME}}/config
 ```
 
 **Expected:**
@@ -2224,16 +2224,16 @@ vault write auth/kubernetes/config \
     kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443"
 '
 
-kubectl exec -it vault-0 -n vault -- vault policy write flaskapp-policy - <<POLICY
-path "secret/data/flaskapp/*" {
+kubectl exec -it vault-0 -n vault -- vault policy write {{APP_NAME}}-policy - <<POLICY
+path "secret/data/{{APP_NAME}}/*" {
   capabilities = ["read"]
 }
 POLICY
 
-kubectl exec -it vault-0 -n vault -- vault write auth/kubernetes/role/flaskapp \
+kubectl exec -it vault-0 -n vault -- vault write auth/kubernetes/role/{{APP_NAME}} \
     bound_service_account_names=default \
     bound_service_account_namespaces={{APP_NAMESPACE}} \
-    policies=flaskapp-policy \
+    policies={{APP_NAME}}-policy \
     ttl=24h
 
 echo "✅ Vault configured"
@@ -2255,7 +2255,7 @@ cat > README.md << 'EOF'
 ## Add Secrets
 ```bash
 kubectl exec -it vault-0 -n vault -- \
-  vault kv put secret/flaskapp/config key=value
+  vault kv put secret/{{APP_NAME}}/config key=value
 
 ## Verify
 ```bash
@@ -2285,7 +2285,7 @@ kubectl get pods -n vault
 kubectl exec -it vault-0 -n vault -- vault auth list
 
 # Verify role
-kubectl exec -it vault-0 -n vault -- vault read auth/kubernetes/role/flaskapp
+kubectl exec -it vault-0 -n vault -- vault read auth/kubernetes/role/{{APP_NAME}}
 ```
 
 **Expected:**
@@ -2334,8 +2334,8 @@ kubectl exec -it vault-0 -n vault -- vault read auth/kubernetes/role/flaskapp
 
 ```bash
 # Create app directory
-mkdir -p ~/Desktop/{{PROJECT_NAME}}-flaskapp
-cd ~/Desktop/{{PROJECT_NAME}}-flaskapp
+mkdir -p ~/Desktop/{{PROJECT_NAME}}-{{APP_NAME}}
+cd ~/Desktop/{{PROJECT_NAME}}-{{APP_NAME}}
 
 # Initialize git
 git init
@@ -2485,7 +2485,7 @@ spec:
     }
     
     environment {
-        DOCKER_IMAGE = '{{DOCKERHUB_USERNAME}}/{{PROJECT_NAME}}-flaskapp'
+        DOCKER_IMAGE = '{{DOCKERHUB_USERNAME}}/{{PROJECT_NAME}}-{{APP_NAME}}'
         GITOPS_REPO = 'https://github.com/{{GITHUB_USERNAME}}/{{PROJECT_NAME}}-manifests.git'
         APP_VERSION = "${BUILD_NUMBER}"
     }
@@ -2653,7 +2653,7 @@ EOF
 ### Step 5.7: Create GitHub Repository & Push Application to GitHub
 
 ```bash
-cd ~/Desktop/{{PROJECT_NAME}}-flaskapp
+cd ~/Desktop/{{PROJECT_NAME}}-{{APP_NAME}}
 
 # Create .gitignore
 cat > .gitignore << 'EOF'
@@ -2668,7 +2668,7 @@ EOF
 ```bash
 
 # 1. Go to https://github.com/new
-# 2. Repository name: {{PROJECT_NAME}}-flaskapp
+# 2. Repository name: {{PROJECT_NAME}}-{{APP_NAME}}
 # 3. Visibility: **Private**
 # 4. Do NOT initialize with README
 # 5. Create repository
@@ -2684,7 +2684,7 @@ git add .
 git commit -m "init: Sample Flask application initial commit"
 
 # Create GitHub repo and push
-git remote add origin https://github.com/{{GITHUB_USERNAME}}/{{PROJECT_NAME}}-flaskapp.git
+git remote add origin https://github.com/{{GITHUB_USERNAME}}/{{PROJECT_NAME}}-{{APP_NAME}}.git
 git branch -M main
 git push -u origin main
 ```
@@ -2753,10 +2753,10 @@ spec:
         app: {{APP_NAME}}
       annotations:
         vault.hashicorp.com/agent-inject: "true"
-        vault.hashicorp.com/role: "flaskapp"
-        vault.hashicorp.com/agent-inject-secret-config: "secret/data/flaskapp/config"
+        vault.hashicorp.com/role: "{{APP_NAME}}"
+        vault.hashicorp.com/agent-inject-secret-config: "secret/data/{{APP_NAME}}/config"
         vault.hashicorp.com/agent-inject-template-config: |
-          {{ with secret "secret/data/flaskapp/config" -}}
+          {{ with secret "secret/data/{{APP_NAME}}/config" -}}
             export APP_SECRET="{{ .Data.data.app_secret }}"
             export ENVIRONMENT="{{ .Data.data.environment }}"
           {{- end }}
@@ -2890,13 +2890,13 @@ git push -u origin main
 In Jenkins UI (http://{{CONTROL_PLANE_IP}}:{{JENKINS_HTTP_PORT}}):
 
 1. Click **New Item**
-2. Enter name: `{{PROJECT_NAME}}-flaskapp-pipeline`
+2. Enter name: `{{PROJECT_NAME}}-{{APP_NAME}}-pipeline`
 3. Select **Pipeline**
 4. Click **OK**
 
 5. In **General** section:
    - ✅ GitHub project
-   - Project URL: `https://github.com/{{GITHUB_USERNAME}}/{{PROJECT_NAME}}-flaskapp`
+   - Project URL: `https://github.com/{{GITHUB_USERNAME}}/{{PROJECT_NAME}}-{{APP_NAME}}`
 
 6. In **Build Triggers** section:
    - ✅ Poll SCM
@@ -2905,7 +2905,7 @@ In Jenkins UI (http://{{CONTROL_PLANE_IP}}:{{JENKINS_HTTP_PORT}}):
 7. In **Pipeline** section:
    - Definition: `Pipeline script from SCM`
    - SCM: `Git`
-   - Repository URL: `https://github.com/{{GITHUB_USERNAME}}/{{PROJECT_NAME}}-flaskapp.git`
+   - Repository URL: `https://github.com/{{GITHUB_USERNAME}}/{{PROJECT_NAME}}-{{APP_NAME}}.git`
    - Credentials: Select `github-credentials`
    - Branch: `*/main`
    - Script Path: `Jenkinsfile`
@@ -2927,9 +2927,9 @@ In Jenkins UI (http://{{CONTROL_PLANE_IP}}:{{JENKINS_HTTP_PORT}}):
 [Pipeline] podTemplate
 [Pipeline] {
 [Pipeline] node
-Created Pod: jenkins/{{PROJECT_NAME}}-flaskapp-pipeline-X-xxxxx
+Created Pod: jenkins/{{PROJECT_NAME}}-{{APP_NAME}}-pipeline-X-xxxxx
 ...
-[kaniko] INFO[0045] Pushing image to {{DOCKERHUB_USERNAME}}/{{PROJECT_NAME}}-flaskapp:X
+[kaniko] INFO[0045] Pushing image to {{DOCKERHUB_USERNAME}}/{{PROJECT_NAME}}-{{APP_NAME}}:X
 [kaniko] INFO[0046] Pushed image to 1 destinations
 ✅ Kaniko pipeline completed! Version: X
 ```
@@ -3116,7 +3116,7 @@ http://{{CONTROL_PLANE_IP}}:{{APP_HTTP_PORT}}
 **Test the complete CI/CD flow:**
 
 ```bash
-cd ~/Desktop/{{PROJECT_NAME}}-flaskapp
+cd ~/Desktop/{{PROJECT_NAME}}-{{APP_NAME}}
 
 # Modify application
 cat > app.py << 'EOF'
@@ -3177,7 +3177,7 @@ git push origin main
 
 1. **Jenkins (wait 5 minutes for SCM poll):**
    - Go to: http://{{CONTROL_PLANE_IP}}:{{JENKINS_HTTP_PORT}}
-   - Watch `{{PROJECT_NAME}}-flaskapp-pipeline` for new build
+   - Watch `{{PROJECT_NAME}}-{{APP_NAME}}-pipeline` for new build
    - Or manually trigger: **Build Now**
 
 2. **Console Output:**
@@ -3730,11 +3730,11 @@ To collect custom metrics from your Flask application, follow these steps:
 
 **Step 1: Update Flask Application Code**
 
-In your `{{PROJECT_NAME}}-flaskapp` repository, add Prometheus instrumentation:
+In your `{{PROJECT_NAME}}-{{APP_NAME}}` repository, add Prometheus instrumentation:
 
 ```bash
 # Clone or navigate to your Flask app repo
-cd ~/Desktop/{{PROJECT_NAME}}-flaskapp
+cd ~/Desktop/{{PROJECT_NAME}}-{{APP_NAME}}
 
 # Add prometheus_client to requirements.txt
 echo "prometheus-client==0.19.0" >> requirements.txt
@@ -3846,7 +3846,7 @@ spec:
 
 ```bash
 # Commit Flask app changes
-cd ~/Desktop/{{PROJECT_NAME}}-flaskapp
+cd ~/Desktop/{{PROJECT_NAME}}-{{APP_NAME}}
 git add requirements.txt app.py
 git commit -m "feat: add Prometheus metrics instrumentation"
 git push origin main
@@ -4646,7 +4646,7 @@ rm {{PROJECT_BASE_PATH}}/kubeconfig*
 # Step 10: Keep only the git repository
 cd ~/Desktop
 # {{PROJECT_NAME}}/ - KEEP (contains all documentation)
-# {{PROJECT_NAME}}-flaskapp/ - Can delete (backed up in GitHub)
+# {{PROJECT_NAME}}-{{APP_NAME}}/ - Can delete (backed up in GitHub)
 # {{PROJECT_NAME}}-manifests/ - Can delete (backed up in GitHub)
 ```
 
@@ -4763,7 +4763,7 @@ source ~/.zshrc
 - ✅ Local application directories (optional)
 
 **What gets kept:**
-- ✅ Git repositories ({{PROJECT_NAME}}, {{PROJECT_NAME}}-flaskapp, {{PROJECT_NAME}}-manifests on GitHub)
+- ✅ Git repositories ({{PROJECT_NAME}}, {{PROJECT_NAME}}-{{APP_NAME}}, {{PROJECT_NAME}}-manifests on GitHub)
 - ✅ Documentation and code (in GitHub)
 - ✅ Development tools (unless you choose to uninstall)
 - ✅ Terraform state files (for reference)
@@ -5094,7 +5094,7 @@ kubectl get application {{APP_NAME}} -n {{ARGOCD_NAMESPACE}} -o yaml
 
 **Symptoms:**
 ```
-Failed to pull image "{{DOCKERHUB_USERNAME}}/{{PROJECT_NAME}}-flaskapp:X": rpc error: code = Unknown
+Failed to pull image "{{DOCKERHUB_USERNAME}}/{{PROJECT_NAME}}-{{APP_NAME}}:X": rpc error: code = Unknown
 ```
 
 **Solutions:**
@@ -5146,7 +5146,7 @@ kubectl port-forward -n {{JENKINS_NAMESPACE}} svc/jenkins 8080:8080
 **Symptoms:**
 ```
 NAME              READY   STATUS    RESTARTS   AGE
-flaskapp-xxx  0/1     Pending   0          2m
+{{APP_NAME}}-xxx  0/1     Pending   0          2m
 ```
 
 **Solutions:**
@@ -5336,17 +5336,17 @@ vault write auth/kubernetes/config \
     kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443"
 
 # Create policy for app secrets
-vault policy write flaskapp-policy - <<EOF
-path "secret/data/flaskapp/*" {
+vault policy write {{APP_NAME}}-policy - <<EOF
+path "secret/data/{{APP_NAME}}/*" {
   capabilities = ["read"]
 }
 EOF
 
 # Create role binding policy to Service Account
-vault write auth/kubernetes/role/flaskapp \
+vault write auth/kubernetes/role/{{APP_NAME}} \
     bound_service_account_names=default \
     bound_service_account_namespaces={{APP_NAMESPACE}} \
-    policies=flaskapp-policy \
+    policies={{APP_NAME}}-policy \
     ttl=24h
 
 # Exit Vault pod
@@ -5357,13 +5357,13 @@ exit
 ```bash
 # Write application secrets to Vault
 kubectl exec -it vault-0 -n vault -- \
-  vault kv put secret/flaskapp/config \
+  vault kv put secret/{{APP_NAME}}/config \
   app_secret="ProductionSecretValue2024" \
   environment="production"
 
 # Verify (optional)
 kubectl exec -it vault-0 -n vault -- \
-  vault kv get secret/flaskapp/config
+  vault kv get secret/{{APP_NAME}}/config
 ```
 
 **Step 4: Clean Up Failed Pods**
@@ -5540,7 +5540,7 @@ For production or extended training sessions:
 | Terraform | `{{PROJECT_BASE_PATH}}/terraform/` |
 | Ansible | `{{PROJECT_BASE_PATH}}/ansible/` |
 | Kubernetes Manifests | `{{PROJECT_BASE_PATH}}/kubernetes/` |
-| Application Code | `~/Desktop/{{PROJECT_NAME}}-flaskapp/` |
+| Application Code | `~/Desktop/{{PROJECT_NAME}}-{{APP_NAME}}/` |
 | GitOps Manifests | `~/Desktop/{{PROJECT_NAME}}-manifests/` |
 
 ### VM Information
