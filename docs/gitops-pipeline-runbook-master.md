@@ -4074,6 +4074,8 @@ kubectl rollout status deployment/prometheus-server -n monitoring
 
 ### Step 7.11: GitOps-ify the Monitoring Stack (Advanced)
 
+*This step fully integrates the monitoring stack into your GitOps workflow by generating static Kubernetes manifests from Helm charts and defining ArgoCD Applications to manage them, ensuring Prometheus and Grafana are version-controlled and automatically synchronized. It works by using helm template to render the charts with your custom values, committing the YAML to your GitOps repository, and creating ArgoCD Application resources that point to these manifests, establishing declarative control over the entire monitoring layer.*
+
 For true GitOps, convert Helm deployments to ArgoCD Applications:
 
 **Step 1: Generate Manifests from Helm**
@@ -4103,7 +4105,7 @@ git push origin main
 ```bash
 cd {{PROJECT_BASE_PATH}}
 
-cat > kubernetes/applications/monitoring-prometheus.yaml <<'EOF'
+cat > kubernetes/argocd/applications/monitoring-prometheus.yaml <<'EOF'
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -4126,7 +4128,7 @@ spec:
       - CreateNamespace=true
 EOF
 
-cat > kubernetes/applications/monitoring-grafana.yaml <<'EOF'
+cat > kubernetes/argocd/applications/monitoring-grafana.yaml <<'EOF'
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -4150,8 +4152,8 @@ spec:
 EOF
 
 # Apply ArgoCD applications
-kubectl apply -f kubernetes/applications/monitoring-prometheus.yaml
-kubectl apply -f kubernetes/applications/monitoring-grafana.yaml
+kubectl apply -f kubernetes/argocd/applications/monitoring-prometheus.yaml
+kubectl apply -f kubernetes/argocd/applications/monitoring-grafana.yaml
 ```
 
 Now your monitoring stack is managed by ArgoCD!
