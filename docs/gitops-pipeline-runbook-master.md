@@ -514,7 +514,7 @@ echo "==========================="
 │    ↓ Terraform + Multipass                             │
 │  ┌──────────────┐        ┌──────────────┐              │
 │  │ Control VM   │        │ Worker VM    │ ← Creating   │
-│  │ (2CPU, 2GB)  │        │ (2CPU, 2GB)  │              │
+│  │ (2CPU, 3GB)  │        │ (2CPU, 3GB)  │              │
 │  └──────────────┘        └──────────────┘              │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -562,7 +562,7 @@ provider "multipass" {}
 resource "multipass_instance" "k3s_control" {
   name   = "{{CONTROL_PLANE_HOSTNAME}}"
   cpus   = 2
-  memory = "2G"
+  memory = "3G"
   disk   = "10G"
   image  = "22.04"
 
@@ -573,7 +573,7 @@ resource "multipass_instance" "k3s_control" {
 resource "multipass_instance" "k3s_worker" {
   name   = "{{WORKER_HOSTNAME}}"
   cpus   = 2
-  memory = "2G"
+  memory = "3G"
   disk   = "10G"
   image  = "22.04"
 
@@ -1042,7 +1042,7 @@ EOF
 Run system preparation:
 
 ```bash
-cd ~/Desktop/gitops-training-with-runbook
+cd {{PROJECT_BASE_PATH}}
 
 ansible-playbook -i {{PROJECT_BASE_PATH}}/ansible/inventory/hosts.yml {{PROJECT_BASE_PATH}}/ansible/playbooks/prepare-systems.yml
 ```
@@ -1052,7 +1052,7 @@ ansible-playbook -i {{PROJECT_BASE_PATH}}/ansible/inventory/hosts.yml {{PROJECT_
 ### Step 2.6: Verify System Preparation
 
 ```bash
-cd ~/Desktop/gitops-training-with-runbook
+cd {{PROJECT_BASE_PATH}}
 
 # Verify system configuration on both nodes
 ansible k3s_cluster -i ansible/inventory/hosts.yml -a "cat /proc/sys/net/ipv4/ip_forward"
@@ -1864,7 +1864,7 @@ kubectl create secret docker-registry dockerhub-credentials \
 kubectl get secret dockerhub-credentials -n {{JENKINS_NAMESPACE}}
 ```
 
-***If you have skipped here to create dockerhub token and you are done you can now return to line 1594 to continue with the deployment***
+***If you have skipped here to create dockerhub token and you are done you can now return to line 1616 to continue with the deployment***
 
 **Part B: Jenkins UI Credentials**
 
@@ -1895,7 +1895,7 @@ cd {{PROJECT_BASE_PATH}}/kubernetes/argocd
 kubectl create namespace {{ARGOCD_NAMESPACE}}
 
 # Install Argo CD
-kubectl apply --server-side -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl apply --server-side -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
 # Wait for pods to be ready
 kubectl wait --for=condition=Ready pods --all -n {{ARGOCD_NAMESPACE}} --timeout=300s
@@ -3027,6 +3027,9 @@ You already created `dockerhub-credentials` in the Jenkins namespace (Step 4.10)
 Create the Docker Hub secret in the application namespace to pull private images:
 
 ```bash
+# Create the test-app-namespace namespace before creating the secret, we have defined the namespace in the manifests but the manifest is not applied yet. Attempting to create secret without namespace will cause "namespace not found" error.
+kubectl apply -f ~/Desktop/gitops-1-manifests/test-application/namespace.yaml
+
 # Create Docker registry secret in application namespace
 kubectl create secret docker-registry dockerhub-secret \
   --docker-server=https://index.docker.io/v1/ \
@@ -3418,6 +3421,8 @@ prometheus-community    https://prometheus-community.github.io/helm-charts
 
 Create a custom configuration for Prometheus:
 
+*This step creates a custom values.yaml configuration file that tailors the Helm-based Prometheus deployment for your training environment, defining resource limits, scraping rules, and disabling optional components. It works by specifying configuration overrides in YAML format that the Helm chart will use during installation, customizing Prometheus to monitor your Kubernetes cluster and applications efficiently.*
+
 ```bash
 cd {{PROJECT_BASE_PATH}}
 mkdir -p kubernetes/monitoring/prometheus
@@ -3442,7 +3447,7 @@ server:
   # NodePort service for external access
   service:
     type: NodePort
-    nodePort: {{PROMETHEUS_HTTP_PORT}}
+    nodePort: 30090
   
   # Retention period
   retention: "7d"
@@ -3469,61 +3474,6 @@ prometheus-node-exporter:
 # Kube-state-metrics - exposes K8s object metrics
 kube-state-metrics:
   enabled: true
-
-# Service monitors for automatic discovery
-serverFiles:
-  prometheus.yml:
-    scrape_configs:
-      # Scrape Prometheus itself
-      - job_name: 'prometheus'
-        static_configs:
-          - targets: ['localhost:9090']
-      
-      # Kubernetes API server metrics
-      - job_name: 'kubernetes-apiservers'
-        kubernetes_sd_configs:
-          - role: endpoints
-        scheme: https
-        tls_config:
-          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-        relabel_configs:
-          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
-            action: keep
-            regex: default;kubernetes;https
-      
-      # Kubernetes nodes (kubelet)
-      - job_name: 'kubernetes-nodes'
-        kubernetes_sd_configs:
-          - role: node
-        scheme: https
-        tls_config:
-          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-        relabel_configs:
-          - action: labelmap
-            regex: __meta_kubernetes_node_label_(.+)
-      
-      # Kubernetes pods (auto-discovery)
-      - job_name: 'kubernetes-pods'
-        kubernetes_sd_configs:
-          - role: pod
-        relabel_configs:
-          # Only scrape pods with annotation prometheus.io/scrape: "true"
-          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
-            action: keep
-            regex: true
-          # Use custom port if specified
-          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
-            action: replace
-            target_label: __address__
-            regex: ([^:]+)(?::\d+)?;(\d+)
-            replacement: $1:$2
-          # Use custom path if specified (default: /metrics)
-          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
-            action: replace
-            target_label: __metrics_path__
-            regex: (.+)
 EOF
 ```
 
@@ -4059,17 +4009,19 @@ count(kube_pod_info) by (namespace)
 
 Prometheus can alert on conditions. Example alert for pod restarts:
 
-**Step 1: Create Alert Rules**
+**Step 1: Update Prometheus Values with Alert Rules**
 
-```bash
-cat > kubernetes/monitoring/prometheus/alert-rules.yaml <<'EOF'
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: prometheus-alerts
-  namespace: monitoring
-data:
-  alerts.yml: |
+Edit `kubernetes/monitoring/prometheus/values.yaml` and add the `serverFiles` section after the `global` configuration:
+
+```yaml
+  # Global scrape settings
+  global:
+    scrape_interval: 15s
+    evaluation_interval: 15s
+
+# Add Alert rules configuration
+serverFiles:
+  alerting_rules.yml:
     groups:
       - name: pod_alerts
         interval: 30s
@@ -4091,17 +4043,32 @@ data:
             annotations:
               summary: "Pod {{ $labels.pod }} not ready"
               description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been in {{ $labels.phase }} state for more than 10 minutes"
-EOF
 
-# Apply alert rules
-kubectl apply -f kubernetes/monitoring/prometheus/alert-rules.yaml
+# Alertmanager (disabled for training - can enable later)
+alertmanager:
+  enabled: false
 ```
 
-**Step 2: View Alerts in Prometheus**
+**Step 2: Upgrade Prometheus with New Configuration**
 
-- Open Prometheus UI: http://{{CONTROL_PLANE_IP}}:{{PROMETHEUS_HTTP_PORT}}
+```bash
+helm upgrade prometheus prometheus-community/prometheus \
+  --namespace monitoring \
+  -f ~/Desktop/gitops-1/kubernetes/monitoring/prometheus/values.yaml
+```
+
+Wait for the upgrade to complete:
+
+```bash
+kubectl rollout status deployment/prometheus-server -n monitoring
+```
+
+**Step 3: Verify Alerts in Prometheus**
+
+- Open Prometheus UI: http://192.168.2.18:30090
 - Click **Alerts** tab
-- Should see your configured alerts
+- You should see your configured alerts: `PodRestartingTooMuch` and `PodNotReady`
+- Alerts will show as "Inactive" (green) until conditions are met
 
 ---
 
@@ -5505,8 +5472,8 @@ This ensures secrets and configurations survive restarts.
 
 | VM | IP | Role | Resources |
 |----|----|-|-----------|
-| {{CONTROL_PLANE_HOSTNAME}} | {{CONTROL_PLANE_IP}} | Control Plane | 2 CPU, 2GB RAM, 10GB disk |
-| {{WORKER_HOSTNAME}} | {{WORKER_NODE_IP}} | Worker Node | 2 CPU, 2GB RAM, 10GB disk |
+| {{CONTROL_PLANE_HOSTNAME}} | {{CONTROL_PLANE_IP}} | Control Plane | 2 CPU, 3GB RAM, 10GB disk |
+| {{WORKER_HOSTNAME}} | {{WORKER_NODE_IP}} | Worker Node | 2 CPU, 3GB RAM, 10GB disk |
 
 ### Common Commands
 
