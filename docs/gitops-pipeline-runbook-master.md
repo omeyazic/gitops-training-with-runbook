@@ -5388,6 +5388,79 @@ For production environments, use Vault with persistent storage:
 
 This ensures secrets and configurations survive restarts.
 
+
+#### Issue 13: Vault Agent Injector Not Injecting Sidecars After System Sleep
+
+**Problem:**
+
+After your Mac goes to sleep or restarts, new application pods are created without Vault Agent sidecar containers, causing them to crash with:
+
+```bash
+/bin/sh: 1: .: cannot open /vault/secrets/config: No such file
+```
+
+**Symptoms:**
+
+```bash
+# Pods have only 1 container instead of 2 (missing vault-agent)
+kubectl get pods -n test-app-namespace
+NAME                               READY   STATUS             RESTARTS   AGE
+test-application-xxxxx-xxxxx       0/1     CrashLoopBackOff   5          3m
+
+# No vault-agent container exists
+kubectl logs POD_NAME -n test-app-namespace -c vault-agent-init
+error: container vault-agent-init is not valid for pod POD_NAME
+
+# Vault Agent Injector shows TLS errors
+kubectl logs -n vault vault-agent-injector-xxxxx-xxxxx --tail=50
+[ERROR] handler: http: TLS handshake error from 10.42.0.0:xxxxx: remote error: tls: bad certificate
+```
+
+**Root Cause:**
+
+The Vault Agent Injector's TLS certificates become invalid after system sleep/wake cycles. The Kubernetes API server can't establish a secure connection to the mutating webhook, so pod mutations (sidecar injection) fail silently due to `failurePolicy: Ignore`.
+
+**Solution:**
+
+Restart the Vault Agent Injector pod to regenerate TLS certificates:
+
+```bash
+# Find and delete the injector pod
+kubectl delete pod -n vault -l app.kubernetes.io/name=vault-agent-injector
+
+# Wait for it to restart
+kubectl get pods -n vault -w
+
+# Verify new pod is running
+kubectl get pods -n vault | grep injector
+
+# Trigger application redeployment
+kubectl rollout restart deployment/test-application -n test-app-namespace
+
+# Watch pods come up with vault sidecars (should show 2/2)
+kubectl get pods -n test-app-namespace -w
+```
+
+**Verification:**
+
+```bash
+# Check injector logs - should see successful mutation requests
+kubectl logs -n vault -l app.kubernetes.io/name=vault-agent-injector --tail=20
+
+# Pods should now have 2 containers
+kubectl get pods -n test-app-namespace
+NAME                               READY   STATUS    RESTARTS   AGE
+test-application-xxxxx-xxxxx       2/2     Running   0          1m
+```
+
+**Prevention:**
+
+For production or extended training sessions:
+- Use persistent Vault with proper certificate rotation
+- Configure webhook `failurePolicy: Fail` to catch injection failures immediately
+- Monitor webhook health and certificate expiration
+
+
 ---
 
 ## Future Enhancements
